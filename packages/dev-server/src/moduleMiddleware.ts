@@ -19,6 +19,14 @@ export async function handleModuleRequest(
 
   const specifier = urlPath.slice('/@modules/'.length);
 
+  // Check if this bare specifier was optimized
+  if (ray.optimizerResult && ray.optimizerResult.optimized[specifier]) {
+    const redirectUrl = ray.optimizerResult.optimized[specifier];
+    res.writeHead(302, { 'Location': redirectUrl });
+    res.end();
+    return true;
+  }
+
   try {
     let code = barePackageCache.get(specifier);
     if (!code) {

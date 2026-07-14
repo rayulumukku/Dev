@@ -55,6 +55,8 @@ export async function startDevServer(options: DevServerOptions) {
   const ray = isPreview ? null : new RayCore(projectRoot, options.mode || 'development');
   if (ray) {
     await ray.init();
+    console.log('[Ray Dev Server] Running dependency optimizer...');
+    await ray.optimize();
   }
 
   // 2. Start HTTP server
@@ -154,6 +156,41 @@ export async function startDevServer(options: DevServerOptions) {
         streaming: true,
         hydration: true,
         renderTimeMs: Number(lastRenderTime.toFixed(2)),
+      }, null, 2));
+      return;
+    }
+
+    // Serve optimized dependencies from .ray/cache/
+    if (pathname.startsWith('/@ray/deps/')) {
+      const depFileName = path.basename(pathname);
+      const cacheFilePath = path.join(projectRoot, '.ray/cache', depFileName);
+      try {
+        const rawContent = await fs.readFile(cacheFilePath);
+        res.writeHead(200, { 'Content-Type': 'application/javascript' });
+        res.end(rawContent);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Dependency Not Found');
+      }
+      return;
+    }
+
+    // Diagnostics: Expose Optimizer status
+    if (pathname === '/__ray/optimizer') {
+      const optResult = ray?.optimizerResult || {
+        optimized: {},
+        cacheHits: 0,
+        cacheMisses: 0,
+        optimizationTimeMs: 0,
+        scanTimeMs: 0,
+      };
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        optimized: Object.keys(optResult.optimized || {}),
+        cacheHits: optResult.cacheHits || 0,
+        cacheMisses: optResult.cacheMisses || 0,
+        optimizationTimeMs: optResult.optimizationTimeMs || 0,
       }, null, 2));
       return;
     }

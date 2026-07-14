@@ -16,12 +16,14 @@ import { hmrPlugin } from './plugin/builtins/hmrPlugin.js';
 import { envPlugin } from './plugin/builtins/envPlugin.js';
 import { loadEnv } from './plugin/env.js';
 import { PluginContext } from './plugin/index.js';
+import { runOptimizer } from './optimizer/index.js';
 
 export { Resolver } from './resolver/index.js';
 export { DependencyGraph } from './graph/index.js';
 export { ModuleNode } from './graph/moduleNode.js';
 export { buildProject } from './build/index.js';
 export { PluginContainer } from './plugin/container.js';
+export { runOptimizer } from './optimizer/index.js';
 export * from './plugin/index.js';
 
 export class RayCore {
@@ -32,6 +34,7 @@ export class RayCore {
   config: any = { plugins: [] };
   mode: string;
   env: Record<string, string> = {};
+  optimizerResult: any = null;
 
   constructor(projectRoot: string, mode = 'development') {
     this.projectRoot = projectRoot;
@@ -83,6 +86,14 @@ export class RayCore {
   }
 
   /**
+   * Triggers the dependency pre-bundling optimizer.
+   */
+  async optimize(options: { force?: boolean; clear?: boolean } = {}) {
+    this.optimizerResult = await runOptimizer(this.projectRoot, this.config, this.resolver, options);
+    return this.optimizerResult;
+  }
+
+  /**
    * Resolves an import specifier.
    */
   resolve(specifier: string, importer: string): string {
@@ -93,6 +104,10 @@ export class RayCore {
       if (specifier.startsWith('/@modules/')) {
         const bareSpec = specifier.slice('/@modules/'.length);
         return this.resolver.resolveBarePackage(bareSpec, this.projectRoot);
+      }
+      if (specifier.startsWith('/@ray/deps/')) {
+        const fileName = path.basename(specifier);
+        return path.join(this.projectRoot, '.ray/cache', fileName);
       }
       return path.join(this.projectRoot, specifier.slice(1));
     }

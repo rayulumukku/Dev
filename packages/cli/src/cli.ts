@@ -122,6 +122,29 @@ if (command === 'dev') {
   }
   console.log('[Ray CLI] Serving production build preview...');
   startDevServer({ port, preview: true } as any);
+} else if (command === 'optimize') {
+  (async () => {
+    try {
+      const { RayCore } = await import('@ray/core');
+      const core = new RayCore(process.cwd());
+      await core.init();
+
+      const force = args.includes('--force');
+      const clear = args.includes('--clear');
+
+      console.log(`[Ray CLI] Running manual dependency optimization...`);
+      const result = await core.optimize({ force, clear });
+
+      if (!clear) {
+        console.log(`[Ray CLI] Optimized packages:`, Object.keys(result.optimized));
+        console.log(`[Ray CLI] Optimization completed in ${result.optimizationTimeMs}ms (Scan: ${result.scanTimeMs}ms).`);
+      }
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Optimize command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'inspect' && args.includes('--lib')) {
   (async () => {
     try {
