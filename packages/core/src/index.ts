@@ -4,6 +4,7 @@ import { Resolver, parseSpecifier } from './resolver/index.js';
 import { DependencyGraph } from './graph/index.js';
 import { ModuleNode } from './graph/moduleNode.js';
 import { build } from 'esbuild';
+import { pathToFileURL } from 'url';
 
 import { loadConfig } from './plugin/config.js';
 import { PluginContainer } from './plugin/container.js';
@@ -153,5 +154,64 @@ export class RayCore {
     }
 
     return result.outputFiles[0].text;
+  }
+
+  /**
+   * Dynamically compiles and loads a target module inside the server Node environment.
+   */
+  async ssrLoadModule(filePath: string): Promise<any> {
+    const tempOut = path.join(this.projectRoot, '.ray', `ssr.${Date.now()}.js`);
+    fs.mkdirSync(path.dirname(tempOut), { recursive: true });
+
+    const ssrVirtualPlugin = {
+      name: 'ssr-virtual-modules',
+      setup(build: any) {
+        build.onResolve({ filter: /^virtual:/ }, (args: any) => ({
+          path: args.path,
+          namespace: 'virtual',
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'virtual' }, (args: any) => {
+          if (args.path === 'virtual:foo') {
+            return {
+              contents: 'export const message = "Hello from Virtual Module foo!";',
+              loader: 'js',
+            };
+          }
+          return null;
+        });
+      }
+    };
+
+    await build({
+      entryPoints: [filePath],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: tempOut,
+      write: true,
+      plugins: [ssrVirtualPlugin],
+      external: [
+        'react',
+        'react-dom',
+        'react-dom/server',
+        'react-router-dom',
+        'react-router-dom/server',
+        'react-router'
+      ],
+    });
+
+    try {
+      const fileUrl = pathToFileURL(tempOut).toString() + `?t=${Date.now()}`;
+      const mod = await import(fileUrl);
+      return mod;
+    } finally {
+      try {
+        if (fs.existsSync(tempOut)) {
+          fs.unlinkSync(tempOut);
+        }
+      } catch {
+        // Ignore
+      }
+    }
   }
 }

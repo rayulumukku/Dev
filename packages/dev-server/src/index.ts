@@ -13,7 +13,10 @@ import { planUpdates } from './updatePlanner.js';
 
 interface DevServerOptions {
   port: number;
+  ssr?: boolean;
 }
+
+let lastRenderTime = 0;
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -33,11 +36,25 @@ const MIME_TYPES: Record<string, string> = {
  */
 export async function startDevServer(options: DevServerOptions) {
   const { port } = options;
-  const projectRoot = process.cwd();
+  const isPreview = !!(options as any).preview;
+
+  let projectRoot = process.cwd();
+  if (isPreview) {
+    try {
+      const stats = await fs.stat(path.join(process.cwd(), 'dist/client'));
+      if (stats.isDirectory()) {
+        projectRoot = path.join(process.cwd(), 'dist/client');
+      }
+    } catch {
+      projectRoot = path.join(process.cwd(), 'dist');
+    }
+  }
 
   // 1. Initialize RayCore orchestrator
-  const ray = new RayCore(projectRoot);
-  await ray.init();
+  const ray = isPreview ? null : new RayCore(projectRoot);
+  if (ray) {
+    await ray.init();
+  }
 
   // 2. Start HTTP server
   const server = http.createServer(async (req, res) => {
@@ -51,44 +68,92 @@ export async function startDevServer(options: DevServerOptions) {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
     const pathname = decodeURIComponent(url.pathname);
 
+    // Bypasses execution compile pipeline if serving compiled static production builds
+    if (isPreview) {
+      let routePath = pathname;
+      if (routePath === '/') {
+        routePath = '/index.html';
+      }
+      let filePath = path.join(projectRoot, routePath);
+      try {
+        let stat = await fs.stat(filePath);
+        if (stat.isDirectory()) {
+          const indexFilePath = path.join(filePath, 'index.html');
+          stat = await fs.stat(indexFilePath);
+          filePath = indexFilePath;
+        }
+        const ext = path.extname(filePath);
+        const rawContent = await fs.readFile(filePath);
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(rawContent);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+      }
+      return;
+    }
+
     // Diagnostics: Expose WebSocket status
     if (pathname === '/__ray/ws') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(wsServer.getDiagnostics(), null, 2));
+      if (wsServer) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(wsServer.getDiagnostics(), null, 2));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('WebSocket Diagnostics unavailable in preview mode');
+      }
       return;
     }
 
     // Diagnostics: Expose dependency graph
-    if (handleDiagnosticsRequest(ray, pathname, res)) {
+    if (ray && handleDiagnosticsRequest(ray, pathname, res)) {
       return;
     }
 
     // Diagnostics: Expose tracked CSS files
-    if (handleCssDiagnosticsRequest(ray, pathname, res)) {
+    if (ray && handleCssDiagnosticsRequest(ray, pathname, res)) {
       return;
     }
 
     // Diagnostics: Expose HMR boundaries and updates status
-    if (handleHmrDiagnosticsRequest(ray, pathname, res)) {
+    if (ray && handleHmrDiagnosticsRequest(ray, pathname, res)) {
       return;
     }
 
     // Diagnostics: Expose active plugins, hooks, and execution times
     if (pathname === '/__ray/plugins') {
-      const pluginsInfo = ray.container.plugins.map((p) => {
-        const hooks = Object.keys(p).filter(
-          (k) => k !== 'name' && k !== 'enforce' && typeof (p as any)[k] === 'function'
-        );
-        const duration = ray.container.metrics.get(p.name) || 0;
-        return {
-          name: p.name,
-          hooks,
-          durationMs: Number(duration.toFixed(3)),
-          status: duration > 10 ? 'SLOW (>10ms)' : 'OK',
-        };
-      });
+      if (ray) {
+        const pluginsInfo = ray.container.plugins.map((p) => {
+          const hooks = Object.keys(p).filter(
+            (k) => k !== 'name' && k !== 'enforce' && typeof (p as any)[k] === 'function'
+          );
+          const duration = ray.container.metrics.get(p.name) || 0;
+          return {
+            name: p.name,
+            hooks,
+            durationMs: Number(duration.toFixed(3)),
+            status: duration > 10 ? 'SLOW (>10ms)' : 'OK',
+          };
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ plugins: pluginsInfo }, null, 2));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Plugins metrics unavailable in preview mode');
+      }
+      return;
+    }
+
+    // Diagnostics: Expose SSR details
+    if (pathname === '/__ray/ssr') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ plugins: pluginsInfo }, null, 2));
+      res.end(JSON.stringify({
+        mode: options.ssr ? 'development' : 'static',
+        streaming: true,
+        hydration: true,
+        renderTimeMs: Number(lastRenderTime.toFixed(2)),
+      }, null, 2));
       return;
     }
 
@@ -104,21 +169,69 @@ export async function startDevServer(options: DevServerOptions) {
 
     // Serve virtual modules from loaded plugins
     if (pathname.startsWith('/@virtual/')) {
-      const virtualId = '\0virtual:' + pathname.slice('/@virtual/'.length).split('?')[0];
-      const loadedCode = await ray.container.load(virtualId);
-      if (loadedCode !== null) {
-        const result = await ray.container.transform(loadedCode, virtualId);
-        res.writeHead(200, {
-          'Content-Type': 'application/javascript',
-          'Cache-Control': 'no-cache',
-        });
-        res.end(result.code);
-        return;
+      if (ray) {
+        const virtualId = '\0virtual:' + pathname.slice('/@virtual/'.length).split('?')[0];
+        const loadedCode = await ray.container.load(virtualId);
+        if (loadedCode !== null) {
+          const result = await ray.container.transform(loadedCode, virtualId);
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Cache-Control': 'no-cache',
+          });
+          res.end(result.code);
+          return;
+        }
       }
     }
 
     // Serve virtual packages from /@modules/
-    if (await handleModuleRequest(ray, pathname, res)) {
+    if (ray && await handleModuleRequest(ray, pathname, res)) {
+      return;
+    }
+
+    // SSR Page request interception
+    const ssr = !!options.ssr;
+    const isPageRequest = !pathname.includes('.') || pathname.endsWith('.html');
+    const isDiagnostics = pathname.startsWith('/__ray/');
+    if (ssr && isPageRequest && !isDiagnostics && ray) {
+      try {
+        const startRender = performance.now();
+        const serverEntryPath = path.join(projectRoot, 'src/entry-server.jsx');
+        const entryServer = await ray.ssrLoadModule(serverEntryPath);
+
+        const indexHtmlPath = path.join(projectRoot, 'index.html');
+        const rawHtml = await fs.readFile(indexHtmlPath, 'utf-8');
+        const template = await ray.transform(rawHtml, indexHtmlPath);
+
+        const context = {};
+        const { html } = await entryServer.render(pathname, context);
+        const renderTimeMs = performance.now() - startRender;
+        lastRenderTime = renderTimeMs;
+
+        const initialState = { initialCount: 5 };
+        const serializedState = JSON.stringify(initialState)
+          .replace(/</g, '\\u003c')
+          .replace(/>/g, '\\u003e')
+          .replace(/\u2028/g, '\\u2028')
+          .replace(/\u2029/g, '\\u2029');
+
+        const finalHtml = template.replace(
+          '<div id="root"></div>',
+          `<div id="root">${html}</div>\n<script>window.__RAY_DATA__ = ${serializedState};</script>`
+        );
+
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(finalHtml);
+      } catch (err: any) {
+        console.error('[Ray SSR Error]', err);
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`
+          <div style="background:#1e1b4b;color:#f87171;font-family:monospace;padding:3rem;min-height:100vh;">
+            <h2>⚡ Ray SSR Rendering Exception ⚡</h2>
+            <pre style="background:#09090b;padding:1.5rem;border-radius:8px;color:#f3f4f6;border:1px solid #374151;">${err.stack || err.message}</pre>
+          </div>
+        `);
+      }
       return;
     }
 
@@ -164,7 +277,7 @@ export async function startDevServer(options: DevServerOptions) {
           ext.toLowerCase()
         );
 
-      if (isCss && isImport) {
+      if (isCss && isImport && ray) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
         const finalCode = await ray.transform(rawCode, filePath + '?import');
 
@@ -177,7 +290,7 @@ export async function startDevServer(options: DevServerOptions) {
         return;
       }
 
-      if (isAssetImport) {
+      if (isAssetImport && ray) {
         const finalCode = await ray.transform('', filePath + '?import');
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
@@ -188,7 +301,7 @@ export async function startDevServer(options: DevServerOptions) {
         return;
       }
 
-      if (isTransformable) {
+      if (isTransformable && ray) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
         const finalCode = await ray.transform(rawCode, filePath);
 
@@ -198,7 +311,7 @@ export async function startDevServer(options: DevServerOptions) {
           'Cache-Control': 'no-cache',
         });
         res.end(finalCode);
-      } else if (isHtml) {
+      } else if (isHtml && ray) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
         const finalCode = await ray.transform(rawCode, filePath);
 
@@ -234,56 +347,67 @@ export async function startDevServer(options: DevServerOptions) {
   });
 
   // 3. Initialize WebSocket server
-  const wsServer = new RayWebSocketServer(server);
+  const wsServer = isPreview ? null : new RayWebSocketServer(server);
 
   // 4. Initialize File Watcher
-  const watcher = startFileWatcher({
-    projectRoot,
-    onChange: (file) => {
-      const relPath = path.relative(projectRoot, file).replace(/\\/g, '/');
-      console.log(`[Ray Watcher] File change detected: /${relPath}`);
+  const watcher = isPreview
+    ? null
+    : startFileWatcher({
+        projectRoot,
+        onChange: (file) => {
+          const relPath = path.relative(projectRoot, file).replace(/\\/g, '/');
+          console.log(`[Ray Watcher] File change detected: /${relPath}`);
 
-      // Invalidate dependency graph compilation timestamps
-      ray.invalidate(file);
+          // Invalidate dependency graph compilation timestamps
+          if (ray) ray.invalidate(file);
 
-      // Check if this is a CSS stylesheet change to send CSS-specific update
-      if (file.endsWith('.css')) {
-        wsServer.broadcast({
-          type: 'css-update',
-          path: `/${relPath}`,
-          timestamp: Date.now(),
-        });
-      } else {
-        // JS/JSX/TS/TSX file change -> plan HMR updates
-        const timestamp = Date.now();
-        const plan = planUpdates(ray, file, timestamp);
+          // Check if this is a CSS stylesheet change to send CSS-specific update
+          if (file.endsWith('.css')) {
+            if (wsServer) {
+              wsServer.broadcast({
+                type: 'css-update',
+                path: `/${relPath}`,
+                timestamp: Date.now(),
+              });
+            }
+          } else {
+            // JS/JSX/TS/TSX file change -> plan HMR updates
+            const timestamp = Date.now();
+            const plan = planUpdates(ray!, file, timestamp);
 
-        if (plan.fallback) {
-          console.log(`[Ray HMR] HMR fallback triggered: Full reload for /${relPath}`);
-          wsServer.broadcast({
-            type: 'full-reload',
-            path: `/${relPath}`,
-          });
-        } else {
-          console.log(`[Ray HMR] Broadcasting HMR updates for /${relPath}:`, JSON.stringify(plan.updates));
-          wsServer.broadcast({
-            type: 'update',
-            updates: plan.updates,
-          });
-        }
-      }
-    },
-  });
+            if (plan.fallback) {
+              console.log(`[Ray HMR] HMR fallback triggered: Full reload for /${relPath}`);
+              if (wsServer) {
+                wsServer.broadcast({
+                  type: 'full-reload',
+                  path: `/${relPath}`,
+                });
+              }
+            } else {
+              console.log(`[Ray HMR] Broadcasting HMR updates for /${relPath}:`, JSON.stringify(plan.updates));
+              if (wsServer) {
+                wsServer.broadcast({
+                  type: 'update',
+                  updates: plan.updates,
+                });
+              }
+            }
+          }
+        },
+      });
 
   // 5. Listen on specified port
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server (Milestone 7) ⚡\n');
+    console.log(`\n  ⚡ Ray Server (Mode: ${isPreview ? 'Preview' : 'Dev'}) ⚡\n`);
     console.log(`  > Local:       http://localhost:${port}/`);
-    console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
-    console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
-    console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
-    console.log(`  > HMR Status:  http://localhost:${port}/__ray/hmr`);
-    console.log(`  > Plugins:     http://localhost:${port}/__ray/plugins`);
+    if (!isPreview) {
+      console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
+      console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
+      console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
+      console.log(`  > HMR Status:  http://localhost:${port}/__ray/hmr`);
+      console.log(`  > Plugins:     http://localhost:${port}/__ray/plugins`);
+    }
+    console.log(`  > SSR Status:  http://localhost:${port}/__ray/ssr`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 

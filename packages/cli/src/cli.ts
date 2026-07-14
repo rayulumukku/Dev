@@ -16,7 +16,8 @@ if (command === 'dev') {
     }
   }
 
-  startDevServer({ port });
+  const ssr = args.includes('--ssr');
+  startDevServer({ port, ssr });
 } else if (command === 'build') {
   const options = {
     outDir: 'dist',
@@ -24,14 +25,22 @@ if (command === 'dev') {
     sourcemap: 'external' as any,
     watch: false,
     analyze: false,
+    ssr: false,
+    ssg: false,
   };
 
-  // Parse watch & analyze boolean flags
+  // Parse watch, analyze, ssr & ssg boolean flags
   if (args.includes('--watch')) {
     options.watch = true;
   }
   if (args.includes('--analyze')) {
     options.analyze = true;
+  }
+  if (args.includes('--ssr')) {
+    options.ssr = true;
+  }
+  if (args.includes('--ssg')) {
+    options.ssg = true;
   }
 
   // Parse outDir
@@ -57,14 +66,29 @@ if (command === 'dev') {
     console.error('\n❌ Build Failed:', err.message);
     process.exit(1);
   });
+} else if (command === 'preview') {
+  let port = 3000;
+  const portIdx = args.indexOf('--port');
+  if (portIdx !== -1 && args[portIdx + 1]) {
+    const parsedPort = parseInt(args[portIdx + 1], 10);
+    if (!isNaN(parsedPort)) {
+      port = parsedPort;
+    }
+  }
+  console.log('[Ray CLI] Serving production build preview...');
+  startDevServer({ port, preview: true } as any);
 } else {
   console.log(`
-⚡ Ray CLI (Milestone 6) ⚡
+⚡ Ray CLI (Milestone 8) ⚡
 
 Usage:
   ray dev             Start the live dev server
+  ray dev --ssr       Start the live dev server with Server-Side Rendering
   ray dev --port N    Start the dev server on port N
   ray build           Compile the project for production
+  ray build --ssr     Compile the project for SSR production deployments
+  ray build --ssg     Generate static HTML pre-rendered pages (SSG)
+  ray preview         Serve static production build from dist/
 
 Options for build:
   --outDir <path>     Specify production output directory (default: dist)
