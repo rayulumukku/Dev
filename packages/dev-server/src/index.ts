@@ -2,8 +2,13 @@ import http from 'http';
 import fs from 'fs/promises';
 import path from 'path';
 import { RayCore } from '@ray/core';
-import { transformProjectFile } from './transformPipeline.js';
+import { hmrClientCode } from '@ray/hmr-runtime';
+
+import { transformProjectFile, invalidateProjectFile } from './transformPipeline.js';
 import { handleModuleRequest, handleDiagnosticsRequest } from './moduleMiddleware.js';
+import { RayWebSocketServer } from './websocket/index.js';
+import { startFileWatcher } from './watcher/index.js';
+import { injectHmrClient } from './htmlTransform.js';
 
 interface DevServerOptions {
   port: number;
@@ -22,19 +27,19 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 /**
- * Starts the Ray Development Server.
- * Serves static assets, routes /@modules/ requests to the bare packager,
- * exposes the /__ray/graph debug route, and transforms JSX/JS imports dynamically.
+ * Launches the HTTP Server, WebSocket Server, and File Watcher.
+ * Automatically injects client-side hot reload code into HTML files.
  */
 export function startDevServer(options: DevServerOptions) {
   const { port } = options;
   const projectRoot = process.cwd();
 
-  // Initialize RayCore orchestrator
+  // 1. Initialize RayCore orchestrator
   const ray = new RayCore(projectRoot);
 
+  // 2. Start HTTP server
   const server = http.createServer(async (req, res) => {
-    // Only handle GET requests
+    // Only accept GET requests
     if (req.method !== 'GET') {
       res.writeHead(405, { 'Content-Type': 'text/plain' });
       res.end('Method Not Allowed');
@@ -44,17 +49,34 @@ export function startDevServer(options: DevServerOptions) {
     const url = new URL(req.url || '/', `http://localhost:${port}`);
     const pathname = decodeURIComponent(url.pathname);
 
-    // 1. Serve dependency graph diagnostics
+    // Diagnostics: Expose WebSocket status
+    if (pathname === '/__ray/ws') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(wsServer.getDiagnostics(), null, 2));
+      return;
+    }
+
+    // Diagnostics: Expose dependency graph
     if (handleDiagnosticsRequest(ray, pathname, res)) {
       return;
     }
 
-    // 2. Serve virtual package modules (/@modules/)
+    // Serve virtual WebSocket HMR client code
+    if (pathname === '/@ray/hmr.js') {
+      res.writeHead(200, {
+        'Content-Type': 'application/javascript',
+        'Cache-Control': 'no-store', // Do not cache HMR listener script
+      });
+      res.end(hmrClientCode);
+      return;
+    }
+
+    // Serve virtual packages from /@modules/
     if (await handleModuleRequest(ray, pathname, res)) {
       return;
     }
 
-    // 3. Resolve project files
+    // Resolve project relative file paths
     let routePath = pathname;
     if (routePath === '/') {
       routePath = '/index.html';
@@ -74,11 +96,10 @@ export function startDevServer(options: DevServerOptions) {
       const ext = path.extname(filePath);
       const mtime = stat.mtimeMs;
 
-      // HTTP Cache Validation (If-Modified-Since)
+      // HTTP Cache checking (If-Modified-Since)
       const ifModifiedSince = req.headers['if-modified-since'];
       if (ifModifiedSince) {
         const clientTime = new Date(ifModifiedSince).getTime();
-        // Match timestamps to nearest second
         if (Math.floor(mtime / 1000) <= Math.floor(clientTime / 1000)) {
           res.writeHead(304);
           res.end();
@@ -96,18 +117,25 @@ export function startDevServer(options: DevServerOptions) {
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
           'Last-Modified': new Date(mtime).toUTCString(),
-          'Cache-Control': 'no-cache', // Force client revalidation
+          'Cache-Control': 'no-cache',
         });
         res.end(compiledCode);
       } else {
         // Serve static asset directly
-        const rawContent = await fs.readFile(filePath);
+        let rawContent = await fs.readFile(filePath);
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+        // Automatically inject the WS listener script into HTML files
+        if (contentType === 'text/html') {
+          const html = rawContent.toString('utf-8');
+          const injectedHtml = injectHmrClient(html);
+          rawContent = Buffer.from(injectedHtml, 'utf-8');
+        }
 
         res.writeHead(200, {
           'Content-Type': contentType,
           'Last-Modified': new Date(mtime).toUTCString(),
-          'Cache-Control': 'no-cache', // Force client revalidation
+          'Cache-Control': 'no-cache',
         });
         res.end(rawContent);
       }
@@ -124,12 +152,41 @@ export function startDevServer(options: DevServerOptions) {
     }
   });
 
+  // 3. Initialize WebSocket server
+  const wsServer = new RayWebSocketServer(server);
+
+  // 4. Initialize File Watcher
+  const watcher = startFileWatcher({
+    projectRoot,
+    onChange: (file) => {
+      const relPath = path.relative(projectRoot, file).replace(/\\/g, '/');
+      console.log(`[Ray Watcher] File change detected: /${relPath}`);
+
+      // Invalidate dev-server memory cache
+      invalidateProjectFile(file);
+      // Invalidate dependency graph compilation timestamps
+      ray.invalidate(file);
+
+      // Broadcast full reload command via WS
+      wsServer.broadcast({
+        type: 'full-reload',
+        path: `/${relPath}`,
+      });
+    },
+  });
+
+  // 5. Listen on specified port
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server (Milestone 2) ⚡\n');
+    console.log('\n  ⚡ Ray Dev Server (Milestone 3) ⚡\n');
     console.log(`  > Local:       http://localhost:${port}/`);
     console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
+    console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 
-  return server;
+  return {
+    server,
+    wsServer,
+    watcher,
+  };
 }

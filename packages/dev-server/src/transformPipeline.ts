@@ -25,3 +25,10 @@ export async function transformProjectFile(
   projectFileCache.set(filePath, { code: transformed, mtime });
   return transformed;
 }
+
+/**
+ * Invalidates a compiled file from the dev-server memory cache.
+ */
+export function invalidateProjectFile(filePath: string) {
+  projectFileCache.delete(filePath);
+}
