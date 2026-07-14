@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "ray dev"
+    "dev": "ray dev",
+    "build": "ray build",
+    "build:analyze": "ray build --analyze"
   },
   "dependencies": {
     "@ray/cli": "*",

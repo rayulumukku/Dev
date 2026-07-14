@@ -11,6 +11,7 @@
     "ray": "./bin/ray.js"
   },
   "dependencies": {
-    "@ray/dev-server": "*"
+    "@ray/dev-server": "*",
+    "@ray/core": "*"
   }
 }

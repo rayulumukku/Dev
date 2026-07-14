@@ -12,6 +12,7 @@ import { transformJsx } from '@ray/transform';
 export { Resolver } from './resolver/index.js';
 export { DependencyGraph } from './graph/index.js';
 export { ModuleNode } from './graph/moduleNode.js';
+export { buildProject } from './build/index.js';
 
 export class RayCore {
   resolver: Resolver;
