@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
 import { startDevServer } from '@ray/dev-server';
 import { buildProject } from '@ray/core';
 import { runCreateProject } from './create.js';
@@ -28,6 +29,39 @@ if (command === 'dev') {
 
   const ssr = args.includes('--ssr');
   startDevServer({ port, ssr, mode });
+} else if (command === 'studio') {
+  let port = 3000;
+  const portIdx = args.indexOf('--port');
+  if (portIdx !== -1 && args[portIdx + 1]) {
+    const parsedPort = parseInt(args[portIdx + 1], 10);
+    if (!isNaN(parsedPort)) {
+      port = parsedPort;
+    }
+  }
+
+  (async () => {
+    try {
+      console.log(`[Ray Studio] Launching visual developer dashboard on port ${port}...`);
+      await startDevServer({ port, ssr: false, mode });
+
+      const studioUrl = `http://localhost:${port}/__ray/studio`;
+      try {
+        if (process.platform === 'win32') {
+          exec(`start "" "${studioUrl}"`);
+        } else if (process.platform === 'darwin') {
+          exec(`open "${studioUrl}"`);
+        } else {
+          exec(`xdg-open "${studioUrl}"`);
+        }
+        console.log(`[Ray Studio] Automatically opened browser to ${studioUrl}`);
+      } catch (err: any) {
+        console.warn(`[Ray Studio Warning] Could not open browser automatically: ${err.message}`);
+      }
+    } catch (err: any) {
+      console.error('[Ray Studio Error] Failed to launch:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'build') {
   let buildMode = 'production';
   const modeIdx = args.indexOf('--mode');
@@ -342,12 +376,13 @@ export default defineConfig({
   })();
 } else {
   console.log(`
- ⚡ Ray CLI (Milestone 14 - Production Hardening) ⚡
+ ⚡ Ray CLI (Milestone 15 - Ray Studio Visual Inspector) ⚡
 
 Usage:
   ray dev             Start the live dev server
   ray dev --ssr       Start the live dev server with Server-Side Rendering
   ray dev --port N    Start the dev server on port N
+  ray studio          Start the dev server and open Ray Studio dashboard
   ray build           Compile the project for production
   ray build --ssr     Compile the project for SSR production deployments
   ray build --ssg     Generate static HTML pre-rendered pages (SSG)

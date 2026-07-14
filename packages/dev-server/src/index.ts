@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { RayCore } from '@ray/core';
 import { hmrClientCode } from '@ray/hmr-runtime';
 
@@ -180,6 +181,93 @@ export async function startDevServer(options: DevServerOptions) {
         streaming: true,
         hydration: true,
         renderTimeMs: Number(lastRenderTime.toFixed(2)),
+      }, null, 2));
+      return;
+    }
+
+    // Diagnostics: Serve Ray Studio dashboard HTML
+    if (pathname === '/__ray/studio') {
+      const dir = path.dirname(fileURLToPath(import.meta.url));
+      let studioHtmlPath = path.join(dir, 'studio.html');
+      try {
+        await fs.access(studioHtmlPath);
+      } catch {
+        studioHtmlPath = path.join(dir, '../src/studio.html');
+      }
+      try {
+        const html = await fs.readFile(studioHtmlPath, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+      } catch (err: any) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end(`Failed to load Studio dashboard: ${err.message}`);
+      }
+      return;
+    }
+
+    // Diagnostics: Expose transformation stages code for diff compares
+    if (pathname === '/__ray/transform-stages') {
+      const targetFile = url.searchParams.get('file');
+      if (targetFile) {
+        let stages = ray?.container.transformStages.get(targetFile) || [];
+        if (stages.length === 0) {
+          stages = ray?.container.transformStages.get(path.resolve(projectRoot, targetFile)) || [];
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ stages }, null, 2));
+      } else {
+        const files = ray ? Array.from(ray.container.transformStages.keys()) : [];
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(files, null, 2));
+      }
+      return;
+    }
+
+    // Diagnostics: Expose full runtime diagnostics snapshot
+    if (pathname === '/__ray/studio/diagnostics') {
+      const memory = process.memoryUsage();
+      const metrics = {
+        heapTotal: memory.heapTotal,
+        heapUsed: memory.heapUsed,
+        rss: memory.rss,
+        external: memory.external,
+      };
+      const pluginsInfo = ray ? ray.container.plugins.map((p) => {
+        const hooks = Object.keys(p).filter(
+          (k) => k !== 'name' && k !== 'enforce' && typeof (p as any)[k] === 'function'
+        );
+        const duration = ray.container.metrics.get(p.name) || 0;
+        return {
+          name: p.name,
+          hooks,
+          durationMs: Number(duration.toFixed(3)),
+          status: duration > 10 ? 'SLOW (>10ms)' : 'OK',
+        };
+      }) : [];
+
+      const graphSnap = ray ? ray.graph.toJSON() : { modules: [] };
+      const optResult = ray?.optimizerResult || {
+        optimized: {},
+        cacheHits: 0,
+        cacheMisses: 0,
+        optimizationTimeMs: 0,
+        scanTimeMs: 0,
+      };
+
+      const clientVars = ray ? Object.keys(ray.env).filter(k => k.startsWith(ray.config.envPrefix || 'RAY_')) : [];
+      const studioApiSnap = (globalThis as any).__ray_studio?.getSnapshot?.() || { panels: [], timeline: [], metrics: {} };
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        metrics,
+        plugins: { plugins: pluginsInfo },
+        graph: graphSnap,
+        optimizer: optResult,
+        env: {
+          mode: ray ? ray.mode : 'development',
+          clientVariables: clientVars,
+        },
+        studio: studioApiSnap,
       }, null, 2));
       return;
     }

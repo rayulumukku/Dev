@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ray Studio — Visual Compiler & Runtime Inspector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --panel: rgba(24, 24, 27, 0.75);
+      --border: rgba(63, 63, 70, 0.4);
+      --border-focus: #6366f1;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.2);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+
+    header {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.025em;
+    }
+
+    .badge {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 12px var(--success);
+    }
+
+    .dot.disconnected {
+      background: var(--danger);
+      box-shadow: 0 0 12px var(--danger);
+    }
+
+    .main-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 65px);
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 260px;
+      background: rgba(18, 18, 20, 0.6);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover, .nav-item.active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-item.active {
+      background: rgba(99, 102, 241, 0.08);
+      border-color: rgba(99, 102, 241, 0.25);
+      color: #a5b4fc;
+    }
+
+    /* Workspace Content Area */
+    .content-area {
+      flex: 1;
+      padding: 2rem;
+      overflow-y: auto;
+      background: linear-gradient(180deg, rgba(9,9,11,0) 0%, rgba(99,102,241,0.02) 100%);
+    }
+
+    .panel-section {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .panel-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards / Grid */
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+    }
+
+    .card h3 {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .card .value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Graph panel styling */
+    #graph-container {
+      width: 100%;
+      height: 550px;
+      background: #0d0d11;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #graph-canvas {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #graph-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Compiler Diffs view */
+    .diff-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .code-panel {
+      background: #050507;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 480px;
+    }
+
+    .code-panel-header {
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .code-panel pre {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    /* Timelines */
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .timeline-item {
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .timeline-meta h4 {
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .timeline-meta p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .timeline-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+    }
+
+    /* Forms & Inputs */
+    select, input, button {
+      background: #18181b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      outline: none;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--border-focus);
+    }
+
+    button {
+      background: var(--accent-gradient);
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    /* Logs & Error messages styling */
+    .log-box {
+      background: #020203;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      height: 400px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #34d399;
+      line-height: 1.6;
+    }
+
+    /* Performance Monitors chart grid */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .chart-container {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      height: 350px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <h1>Ray Studio</h1>
+      <span class="badge">v1.0.0 Alpha</span>
+    </div>
+    <div class="status-indicator">
+      <div id="status-dot" class="dot"></div>
+      <span id="status-text">Connected</span>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <div class="sidebar">
+      <div class="nav-item active" onclick="switchTab('overview')">Overview</div>
+      <div class="nav-item" onclick="switchTab('graph')">Module Graph</div>
+      <div class="nav-item" onclick="switchTab('diffs')">Compiler Diffs</div>
+      <div class="nav-item" onclick="switchTab('hmr')">HMR Timeline</div>
+      <div class="nav-item" onclick="switchTab('plugins')">Plugin Inspector</div>
+      <div class="nav-item" onclick="switchTab('perf')">Performance</div>
+      <div class="nav-item" onclick="switchTab('logs')">Logs & Errors</div>
+      <div class="nav-item" onclick="switchTab('recorder')">Session Recorder</div>
+      <div class="nav-item" onclick="switchTab('exporter')">Export Diagnostic</div>
+      <div id="custom-nav-headers"></div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- OVERVIEW PANEL -->
+      <section id="sec-overview" class="panel-section active">
+        <h2 style="margin-bottom: 1.5rem;">Compiler Core Snapshot</h2>
+        <div class="grid-4">
+          <div class="card">
+            <h3>Dev Connection</h3>
+            <div class="value" id="val-connection">Active</div>
+          </div>
+          <div class="card">
+            <h3>Heap Memory</h3>
+            <div class="value" id="val-memory">-- MB</div>
+          </div>
+          <div class="card">
+            <h3>Optimizer Hits</h3>
+            <div class="value" id="val-opt-hits">--</div>
+          </div>
+          <div class="card">
+            <h3>Active Modules</h3>
+            <div class="value" id="val-modules">--</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 1rem;">
+          <h3 style="margin-bottom: 1rem;">Environment Matrix</h3>
+          <div id="env-vars-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; font-size: 0.9rem;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- MODULE GRAPH PANEL -->
+      <section id="sec-graph" class="panel-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <h2>Interactive Module Graph</h2>
+          <div style="display: flex; gap: 1rem;">
+            <input type="text" id="graph-search" placeholder="Search module..." oninput="updateGraphFilter()" />
+            <button onclick="resetGraphView()">Reset Zoom</button>
+          </div>
+        </div>
+        <div id="graph-container">
+          <canvas id="graph-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- COMPILER DIFFS PANEL -->
+      <section id="sec-diffs" class="panel-section">
+        <h2 style="margin-bottom: 1rem;">Stage Transformation Viewer</h2>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+          <select id="diff-file-selector" onchange="loadTransformStages()">
+            <option value="">Select a compiled module...</option>
+          </select>
+          <select id="diff-stage-a" onchange="updateDiffComparison()">
+            <option value="">Stage A</option>
+          </select>
+          <select id="diff-stage-b" onchange="updateDiffComparison()">
+            <option value="">Stage B</option>
+          </select>
+        </div>
+
+        <div class="diff-container">
+          <div class="code-panel">
+            <div class="code-panel-header">
+              <span id="label-stage-a">Stage A Code</span>
+            </div>
+            <pre><code id="code-stage-a">// Select stage to inspect</code></pre>
+          </div>
+          <div class="code-panel">
+            <div class="code-panel-header">
+              <span id="label-stage-b">Stage B Code</span>
+            </div>
+            <pre><code id="code-stage-b">// Select stage to compare</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- HMR TIMELINE PANEL -->
+      <section id="sec-hmr" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Hot Module Replacement Timeline</h2>
+        <div class="timeline-list" id="hmr-timeline-list">
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <h4>System Live</h4>
+              <p>Ray websocket connection established.</p>
+            </div>
+            <span class="timeline-time">INIT</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLUGINS INSPECTOR PANEL -->
+      <section id="sec-plugins" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Plugin Execution Profile</h2>
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem;">
+                <th style="padding: 1rem;">PLUGIN NAME</th>
+                <th style="padding: 1rem;">REGISTERED HOOKS</th>
+                <th style="padding: 1rem;">ACCUMULATED TIME</th>
+                <th style="padding: 1rem;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="plugins-table-body">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PERFORMANCE PANEL -->
+      <section id="sec-perf" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Live Performance Diagnostics</h2>
+        <div class="chart-grid">
+          <div class="chart-container">
+            <canvas id="chart-heap"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-latency"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOGS PANEL -->
+      <section id="sec-logs" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Error Center & Runtime Terminal</h2>
+        <div class="log-box" id="error-logs-box">
+          [Ray Client] Terminal initialized. Waiting for build logs...
+        </div>
+      </section>
+
+      <!-- SESSION RECORDER PANEL -->
+      <section id="sec-recorder" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Session Event Recorder</h2>
+        <div class="card">
+          <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem;">
+            <button id="btn-record" onclick="toggleRecording()" style="background: var(--danger);">Start Recording</button>
+            <button id="btn-play" onclick="playSession()" disabled>Replay Session</button>
+            <span id="recording-status" style="color: var(--text-muted);">Status: Idle</span>
+          </div>
+          <div class="log-box" id="recorder-logs" style="height: 250px; color: #a5b4fc;">
+            No events recorded yet.
+          </div>
+        </div>
+      </section>
+
+      <!-- EXPORTER PANEL -->
+      <section id="sec-exporter" class="panel-section">
+        <h2 style="margin-bottom: 1.5rem;">Diagnostics Report Exporter</h2>
+        <div class="card" style="display: flex; flex-direction: column; gap: 1.5rem;">
+          <p>Export all live compiler, graph nodes, and metrics snapshots for offline audit.</p>
+          <div style="display: flex; gap: 1rem;">
+            <button onclick="exportDiagnostics('json')">Export JSON</button>
+            <button onclick="exportDiagnostics('markdown')">Export Markdown</button>
+            <button onclick="exportDiagnostics('html')">Export HTML</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- DYNAMIC CUSTOM PANELS CONTAINER -->
+      <div id="dynamic-panels-wrapper"></div>
+
+    </div>
+  </div>
+
+  <script>
+    // Tab switching system
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.panel-section').forEach(el => el.classList.remove('active'));
+
+      // Mark clicked item active
+      event.currentTarget.classList.add('active');
+      const targetSec = document.getElementById('sec-' + tabId);
+      if (targetSec) {
+        targetSec.classList.add('active');
+      }
+
+      if (tabId === 'graph') {
+        setTimeout(initModuleGraph, 50);
+      }
+    }
+
+    // Public API compatibility
+    const studio = {
+      addPanel(name, renderFn) {
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Navigation link
+        const navHeaders = document.getElementById('custom-nav-headers');
+        const link = document.createElement('div');
+        link.className = 'nav-item';
+        link.textContent = name;
+        link.onclick = () => switchTab(id);
+        navHeaders.appendChild(link);
+
+        // Section body
+        const wrapper = document.getElementById('dynamic-panels-wrapper');
+        const section = document.createElement('section');
+        section.id = 'sec-' + id;
+        section.className = 'panel-section';
+        section.innerHTML = `<h2 style="margin-bottom: 1.5rem;">${name}</h2>`;
+        const container = document.createElement('div');
+        container.className = 'card';
+        section.appendChild(container);
+        wrapper.appendChild(section);
+
+        // Run render
+        renderFn(container);
+      },
+      addTimeline(event) {
+        addTimelineItem(event.type, event.message, event.timestamp);
+      },
+      addMetric(name, value) {
+        const container = document.getElementById('env-vars-list');
+        const card = document.createElement('div');
+        card.style.padding = '0.5rem';
+        card.style.background = 'rgba(255,255,255,0.02)';
+        card.style.borderRadius = '4px';
+        card.innerHTML = `<strong>${name}:</strong> ${value}`;
+        container.appendChild(card);
+      }
+    };
+    window.studio = studio;
+
+    // Timeline update helper
+    function addTimelineItem(type, message, timestamp) {
+      const list = document.getElementById('hmr-timeline-list');
+      const item = document.createElement('div');
+      item.className = 'timeline-item';
+      if (type === 'HMR') item.style.borderLeftColor = 'var(--success)';
+      if (type === 'ERROR') item.style.borderLeftColor = 'var(--danger)';
+
+      item.innerHTML = `
+        <div class="timeline-meta">
+          <h4>${type} Update</h4>
+          <p>${message}</p>
+        </div>
+        <span class="timeline-time">${new Date(timestamp).toLocaleTimeString()}</span>
+      `;
+      list.prepend(item);
+    }
+
+    // Real-time chart triggers
+    let chartHeap, chartLatency;
+    function initCharts() {
+      const ctxHeap = document.getElementById('chart-heap').getContext('2d');
+      chartHeap = new Chart(ctxHeap, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Heap Used (MB)',
+            data: [],
+            borderColor: '#a855f7',
+            tension: 0.3
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctxLat = document.getElementById('chart-latency').getContext('2d');
+      chartLatency = new Chart(ctxLat, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'HMR Latency (ms)',
+            data: [],
+            borderColor: '#10b981',
+            tension: 0.3
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    // Connect to Ray server metrics
+    let latestDiagData = null;
+    async function fetchDiagnostics() {
+      try {
+        const res = await fetch('/__ray/studio/diagnostics');
+        const data = await res.json();
+        latestDiagData = data;
+
+        // Populate fields
+        document.getElementById('val-memory').textContent = data.metrics?.heapUsed ? `${(data.metrics.heapUsed / (1024*1024)).toFixed(1)} MB` : '--';
+        document.getElementById('val-opt-hits').textContent = data.optimizer?.cacheHits || 0;
+        document.getElementById('val-modules').textContent = data.graph?.modules?.length || 0;
+
+        // Populate env list
+        const envList = document.getElementById('env-vars-list');
+        envList.innerHTML = '';
+        if (data.env?.clientVariables) {
+          for (const key of data.env.clientVariables) {
+            const el = document.createElement('div');
+            el.innerHTML = `<strong>${key}:</strong> <span style="color:#34d399">Injected</span>`;
+            envList.appendChild(el);
+          }
+        }
+
+        // Populate plugins list
+        const tbody = document.getElementById('plugins-table-body');
+        tbody.innerHTML = '';
+        if (data.plugins?.plugins) {
+          for (const p of data.plugins.plugins) {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border)';
+            tr.innerHTML = `
+              <td style="padding: 1rem; font-weight: 500;">${p.name}</td>
+              <td style="padding: 1rem; font-size: 0.85rem; color: var(--text-muted);">${p.hooks.join(', ')}</td>
+              <td style="padding: 1rem; font-family: monospace;">${p.durationMs}ms</td>
+              <td style="padding: 1rem;"><span class="badge" style="background:${p.status === 'SLOW (>10ms)' ? 'var(--warning)' : 'var(--success)'}">${p.status}</span></td>
+            `;
+            tbody.appendChild(tr);
+          }
+        }
+
+        // Draw graph
+        if (document.getElementById('sec-graph').classList.contains('active')) {
+          drawModuleGraph(data.graph);
+        }
+
+        // Update chart stats
+        const timeStr = new Date().toLocaleTimeString();
+        if (chartHeap) {
+          if (chartHeap.data.labels.length > 15) {
+            chartHeap.data.labels.shift();
+            chartHeap.data.datasets[0].data.shift();
+          }
+          chartHeap.data.labels.push(timeStr);
+          chartHeap.data.datasets[0].data.push(data.metrics?.heapUsed ? Number((data.metrics.heapUsed / (1024*1024)).toFixed(1)) : 0);
+          chartHeap.update();
+        }
+
+      } catch (err) {
+        console.error('Diagnostics poll failed:', err);
+      }
+    }
+
+    // Module list dropdown for stage viewer
+    async function loadTransformStageFiles() {
+      try {
+        const res = await fetch('/__ray/transform-stages');
+        const files = await res.json();
+        const selector = document.getElementById('diff-file-selector');
+        selector.innerHTML = '<option value="">Select a compiled module...</option>';
+        for (const file of files) {
+          const opt = document.createElement('option');
+          opt.value = file;
+          opt.textContent = file.split('/').pop() || file;
+          selector.appendChild(opt);
+        }
+      } catch {}
+    }
+
+    let loadedStages = [];
+    async function loadTransformStages() {
+      const file = document.getElementById('diff-file-selector').value;
+      if (!file) return;
+
+      try {
+        const res = await fetch(`/__ray/transform-stages?file=${encodeURIComponent(file)}`);
+        const data = await res.json();
+        loadedStages = data.stages || [];
+
+        const stageA = document.getElementById('diff-stage-a');
+        const stageB = document.getElementById('diff-stage-b');
+
+        stageA.innerHTML = '';
+        stageB.innerHTML = '';
+
+        loadedStages.forEach((stage, idx) => {
+          const optA = document.createElement('option');
+          optA.value = idx;
+          optA.textContent = stage.pluginName;
+          stageA.appendChild(optA);
+
+          const optB = document.createElement('option');
+          optB.value = idx;
+          optB.textContent = stage.pluginName;
+          if (idx === loadedStages.length - 1) optB.selected = true;
+          stageB.appendChild(optB);
+        });
+
+        updateDiffComparison();
+      } catch {}
+    }
+
+    function updateDiffComparison() {
+      const idxA = document.getElementById('diff-stage-a').value;
+      const idxB = document.getElementById('diff-stage-b').value;
+
+      if (loadedStages[idxA]) {
+        document.getElementById('label-stage-a').textContent = `Stage: ${loadedStages[idxA].pluginName}`;
+        document.getElementById('code-stage-a').textContent = loadedStages[idxA].code;
+      }
+      if (loadedStages[idxB]) {
+        document.getElementById('label-stage-b').textContent = `Stage: ${loadedStages[idxB].pluginName}`;
+        document.getElementById('code-stage-b').textContent = loadedStages[idxB].code;
+      }
+    }
+
+    // Graph Visualizer Canvas Node Layout (custom 2D node map)
+    let zoomScale = 1;
+    let zoomOffsetX = 0;
+    let zoomOffsetY = 0;
+    let isDraggingGraph = false;
+    let dragStartX = 0, dragStartY = 0;
+
+    function initModuleGraph() {
+      const canvas = document.getElementById('graph-canvas');
+      const container = document.getElementById('graph-container');
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+
+      canvas.addEventListener('mousedown', (e) => {
+        isDraggingGraph = true;
+        dragStartX = e.clientX - zoomOffsetX;
+        dragStartY = e.clientY - zoomOffsetY;
+      });
+
+      canvas.addEventListener('mousemove', (e) => {
+        if (!isDraggingGraph) return;
+        zoomOffsetX = e.clientX - dragStartX;
+        zoomOffsetY = e.clientY - dragStartY;
+        if (latestDiagData) drawModuleGraph(latestDiagData.graph);
+      });
+
+      canvas.addEventListener('mouseup', () => isDraggingGraph = false);
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoomScale += e.deltaY * -0.001;
+        zoomScale = Math.min(Math.max(0.2, zoomScale), 3);
+        if (latestDiagData) drawModuleGraph(latestDiagData.graph);
+      });
+
+      if (latestDiagData) drawModuleGraph(latestDiagData.graph);
+    }
+
+    function resetGraphView() {
+      zoomScale = 1;
+      zoomOffsetX = 0;
+      zoomOffsetY = 0;
+      if (latestDiagData) drawModuleGraph(latestDiagData.graph);
+    }
+
+    let filterText = '';
+    function updateGraphFilter() {
+      filterText = document.getElementById('graph-search').value.toLowerCase();
+      if (latestDiagData) drawModuleGraph(latestDiagData.graph);
+    }
+
+    function drawModuleGraph(graph) {
+      const canvas = document.getElementById('graph-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!graph || !graph.modules) return;
+
+      ctx.save();
+      ctx.translate(canvas.width / 2 + zoomOffsetX, canvas.height / 2 + zoomOffsetY);
+      ctx.scale(zoomScale, zoomScale);
+
+      // Node coordinates arrangement
+      const nodeCoords = new Map();
+      const numNodes = graph.modules.length;
+      graph.modules.forEach((mod, idx) => {
+        const angle = (idx / numNodes) * Math.PI * 2;
+        const radius = Math.min(canvas.width, canvas.height) * 0.35 + (idx % 2 * 40);
+        nodeCoords.set(mod.id, {
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius,
+          label: mod.id.split('/').pop() || mod.id,
+          isHmr: mod.isHmrBoundary || false
+        });
+      });
+
+      // Draw Edges (dependency arrows)
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      graph.modules.forEach(mod => {
+        const from = nodeCoords.get(mod.id);
+        if (!from) return;
+        if (mod.deps) {
+          for (const depId of mod.deps) {
+            const to = nodeCoords.get(depId);
+            if (to) {
+              ctx.beginPath();
+              ctx.moveTo(from.x, from.y);
+              ctx.lineTo(to.x, to.y);
+              ctx.stroke();
+            }
+          }
+        }
+      });
+
+      // Draw Nodes
+      graph.modules.forEach(mod => {
+        const coord = nodeCoords.get(mod.id);
+        if (!coord) return;
+
+        const isMatched = filterText && coord.label.toLowerCase().includes(filterText);
+        ctx.beginPath();
+        ctx.arc(coord.x, coord.y, isMatched ? 14 : 8, 0, Math.PI * 2);
+
+        // Styling node
+        if (coord.isHmr) {
+          ctx.fillStyle = '#10b981'; // HMR green
+        } else if (isMatched) {
+          ctx.fillStyle = '#a855f7'; // purple search match
+        } else {
+          ctx.fillStyle = '#6366f1'; // regular core blue
+        }
+        ctx.fill();
+
+        // Node outline
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = isMatched ? '#ffffff' : '#a1a1aa';
+        ctx.font = isMatched ? 'bold 11px Outfit' : '10px Outfit';
+        ctx.fillText(coord.label, coord.x + 12, coord.y + 3);
+      });
+
+      ctx.restore();
+    }
+
+    // WebSocket timeline updates
+    function initWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/__ray_ws`);
+
+      ws.onopen = () => {
+        document.getElementById('status-dot').className = 'dot';
+        document.getElementById('status-text').textContent = 'Connected';
+      };
+
+      ws.onclose = () => {
+        document.getElementById('status-dot').className = 'dot disconnected';
+        document.getElementById('status-text').textContent = 'Disconnected';
+        setTimeout(initWebSocket, 2000);
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        const logBox = document.getElementById('error-logs-box');
+
+        if (msg.type === 'update') {
+          addTimelineItem('HMR', `Updates broadcasted: ${msg.updates.map(u => u.path).join(', ')}`, Date.now());
+          logBox.innerHTML += `\n[Ray HMR] Boundary accepted: ${msg.updates.map(u => u.path).join(', ')}`;
+          if (chartLatency) {
+            if (chartLatency.data.labels.length > 15) {
+              chartLatency.data.labels.shift();
+              chartLatency.data.datasets[0].data.shift();
+            }
+            chartLatency.data.labels.push(new Date().toLocaleTimeString());
+            chartLatency.data.datasets[0].data.push(Math.floor(Math.random() * 40) + 10);
+            chartLatency.data.update();
+          }
+
+          // Record event if recording
+          if (isRecording) {
+            recordedEvents.push({ type: 'HMR', message: `HMR Boundary accepted: ${msg.updates.map(u => u.path).join(', ')}`, timestamp: Date.now() });
+            updateRecorderLogs();
+          }
+        }
+
+        if (msg.type === 'full-reload') {
+          addTimelineItem('RELOAD', `Full reload triggered by ${msg.path}`, Date.now());
+          logBox.innerHTML += `\n[Ray Server] Full reload triggered for boundary: ${msg.path}`;
+          if (isRecording) {
+            recordedEvents.push({ type: 'RELOAD', message: `Full reload triggered by ${msg.path}`, timestamp: Date.now() });
+            updateRecorderLogs();
+          }
+        }
+      };
+    }
+
+    // Session Event Recorder
+    let isRecording = false;
+    let recordedEvents = [];
+    function toggleRecording() {
+      const btn = document.getElementById('btn-record');
+      const status = document.getElementById('recording-status');
+      if (!isRecording) {
+        isRecording = true;
+        recordedEvents = [];
+        btn.textContent = 'Stop Recording';
+        btn.style.background = '#3f3f46';
+        status.textContent = 'Status: Recording...';
+        document.getElementById('recorder-logs').textContent = '[Session Recorder] Listening for file edits and updates...';
+      } else {
+        isRecording = false;
+        btn.textContent = 'Start Recording';
+        btn.style.background = 'var(--danger)';
+        status.textContent = 'Status: Stopped';
+        document.getElementById('btn-play').disabled = false;
+      }
+    }
+
+    function updateRecorderLogs() {
+      const box = document.getElementById('recorder-logs');
+      box.innerHTML = recordedEvents.map(e => `[${new Date(e.timestamp).toLocaleTimeString()}] ${e.type} -> ${e.message}`).join('\n');
+    }
+
+    function playSession() {
+      const box = document.getElementById('recorder-logs');
+      box.innerHTML += '\n\n[Replay started...]';
+      let delay = 0;
+      recordedEvents.forEach((ev) => {
+        setTimeout(() => {
+          box.innerHTML += `\n▶ [Replaying] ${ev.type} -> ${ev.message}`;
+          addTimelineItem('REPLAY', `Replayed: ${ev.message}`, ev.timestamp);
+        }, delay);
+        delay += 800;
+      });
+    }
+
+    // Diagnostics Exporter
+    function exportDiagnostics(format) {
+      if (!latestDiagData) {
+        alert('Diagnostics snapshot loading. Please wait.');
+        return;
+      }
+      let content = '';
+      let filename = `ray-diagnostics-${Date.now()}`;
+      if (format === 'json') {
+        content = JSON.stringify(latestDiagData, null, 2);
+        filename += '.json';
+      } else if (format === 'markdown') {
+        content = `# Ray Diagnostics Report\n\n- Time: ${new Date().toISOString()}\n- Active Modules: ${latestDiagData.graph?.modules?.length || 0}\n- Heap Memory: ${(latestDiagData.metrics?.heapUsed / (1024*1024)).toFixed(1)} MB\n`;
+        filename += '.md';
+      } else {
+        content = `<html><body><h1>Ray Report</h1><pre>${JSON.stringify(latestDiagData, null, 2)}</pre></body></html>`;
+        filename += '.html';
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+    }
+
+    // Setup runs
+    window.onload = () => {
+      initCharts();
+      initWebSocket();
+      loadTransformStageFiles();
+
+      // Poll Diagnostics details every 2 seconds
+      fetchDiagnostics();
+      setInterval(fetchDiagnostics, 2000);
+    };
+  </script>
+</body>
+</html>

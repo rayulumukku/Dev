@@ -7,6 +7,8 @@ export class PluginContainer {
   metrics: Map<string, number> = new Map();
   /** Mapped hooks per plugin name */
   hooksMap: Map<string, string[]> = new Map();
+  /** Map tracking intermediate compile stages code by filename key */
+  transformStages: Map<string, Array<{ pluginName: string; code: string }>> = new Map();
 
   constructor(plugins: RayPlugin[], context: PluginContext) {
     const pre = plugins.filter((p) => p.enforce === 'pre');
@@ -71,6 +73,11 @@ export class PluginContainer {
     let currentCode = code;
     let currentMap = undefined;
 
+    const stages: Array<{ pluginName: string; code: string }> = [
+      { pluginName: 'Source', code: currentCode }
+    ];
+    this.transformStages.set(id, stages);
+
     for (const plugin of this.plugins) {
       if (plugin.transform) {
         const result = await this.runHook(plugin, 'transform', () =>
@@ -83,6 +90,7 @@ export class PluginContainer {
             currentCode = result.code;
             if (result.map) currentMap = result.map;
           }
+          stages.push({ pluginName: plugin.name, code: currentCode });
         }
       }
     }
