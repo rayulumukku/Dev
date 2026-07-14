@@ -1,0 +1,13 @@
+{
+  "name": "@ray/transform",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "esbuild": "^0.20.1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/transform" },
+    { "path": "./packages/dev-server" },
+    { "path": "./packages/hmr-runtime" },
+    { "path": "./packages/cli" }
+  ]
+}

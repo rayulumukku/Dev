@@ -1,0 +1,13 @@
+{
+  "name": "@ray/dev-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "@ray/transform": "*"
+  }
+}

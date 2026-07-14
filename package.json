@@ -1,22 +1,18 @@
 {
-  "name": "devops-pipelines",
+  "name": "ray-monorepo",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "demo"
+  ],
   "scripts": {
-    "run": "node index.js",
-    "test": "node test.js"
+    "build": "tsc --build",
+    "clean": "tsc --build --clean"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rayulu7/Devops-Pipelines.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/rayulu7/Devops-Pipelines/issues"
-  },
-  "homepage": "https://github.com/rayulu7/Devops-Pipelines#readme"
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.24"
+  }
 }

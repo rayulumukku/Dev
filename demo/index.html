@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ray Dev Server - Milestone 1 Demo</title>
+  <!-- Browser Importmap: Resolves React imports directly via CDNs in native ESM -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0?dev",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      font-family: 'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+      font-weight: 400;
+
+      color-scheme: dark;
+      color: #f1f1f5;
+      background: radial-gradient(circle at top, #1e1b4b 0%, #09090b 100%);
+
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      margin: 0;
+      display: flex;
+      place-items: center;
+      min-width: 320px;
+      min-height: 100vh;
+      justify-content: center;
+    }
+
+    #root {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 3rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

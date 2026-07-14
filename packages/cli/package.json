@@ -1,0 +1,16 @@
+{
+  "name": "@ray/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "exports": {
+    ".": "./dist/cli.js"
+  },
+  "bin": {
+    "ray": "./bin/ray.js"
+  },
+  "dependencies": {
+    "@ray/dev-server": "*"
+  }
+}
