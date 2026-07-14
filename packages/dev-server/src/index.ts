@@ -148,6 +148,30 @@ export async function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Expose detailed plugins metrics
+    if (pathname === '/__ray/plugins/details') {
+      if (ray) {
+        const pluginsInfo = ray.container.plugins.map((p) => {
+          const hooks = Object.keys(p).filter(
+            (k) => k !== 'name' && k !== 'enforce' && typeof (p as any)[k] === 'function'
+          );
+          const duration = ray.container.metrics.get(p.name) || 0;
+          return {
+            name: p.name,
+            version: '1.0.0',
+            hooks,
+            time: Number(duration.toFixed(3)),
+          };
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ plugins: pluginsInfo }, null, 2));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Plugins metrics unavailable in preview mode');
+      }
+      return;
+    }
+
     // Diagnostics: Expose SSR details
     if (pathname === '/__ray/ssr') {
       res.writeHead(200, { 'Content-Type': 'application/json' });

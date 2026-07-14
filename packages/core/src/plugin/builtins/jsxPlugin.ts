@@ -110,77 +110,7 @@ export function jsxPlugin(): RayPlugin {
         return { file: depId, url: depUrl };
       });
 
-      let finalCode = rewrittenCode;
-      const isProjectFile = !id.includes('node_modules') && !id.includes('\0virtual:');
-
-      if (isProjectFile) {
-        // Intercept react-dom/client createRoot
-        let createRootWrapper = '';
-        if (finalCode.includes('/@modules/react-dom/client')) {
-          finalCode = finalCode.replace(
-            /import\s*\{\s*createRoot\s*\}\s*from\s*["']\/@modules\/react-dom\/client["']/g,
-            'import { createRoot as _createRoot } from "/@modules/react-dom/client"'
-          );
-          createRootWrapper = `
-const createRoot = (container, options) => {
-  const root = _createRoot(container, options);
-  window.__ray_active_roots.add(root);
-  return {
-    render(element) {
-      window.__ray_root_components.set(root, element);
-      root.render(element);
-    },
-    unmount() {
-      window.__ray_active_roots.delete(root);
-      window.__ray_root_components.delete(root);
-      root.unmount();
-    }
-  };
-};
-`;
-        }
-
-        // Detect PascalCase components
-        const componentNames: string[] = [];
-        const funcRegex = /function\s+([A-Z][a-zA-Z0-9_]*)\b/g;
-        let m;
-        while ((m = funcRegex.exec(finalCode)) !== null) {
-          componentNames.push(m[1]);
-        }
-        const constRegex = /const\s+([A-Z][a-zA-Z0-9_]*)\b/g;
-        while ((m = constRegex.exec(finalCode)) !== null) {
-          componentNames.push(m[1]);
-        }
-
-        const uniqueNames = Array.from(new Set(componentNames));
-        node.isSelfAccepting = uniqueNames.length > 0 || code.includes('import.meta.hot.accept');
-
-        for (const name of uniqueNames) {
-          const constPattern = new RegExp(`\\bconst\\s+(${name})\\b`, 'g');
-          finalCode = finalCode.replace(constPattern, 'let $1');
-        }
-
-        let proxyInjections = '';
-        if (uniqueNames.length > 0) {
-          proxyInjections = `\n/* Ray React HMR Component Proxies */\n`;
-          for (const name of uniqueNames) {
-            proxyInjections += `if (typeof ${name} !== 'undefined') {\n  ${name} = window.__ray_register_component(new URL(import.meta.url).pathname, '${name}', ${name});\n}\n`;
-          }
-        }
-
-        let hmrAcceptance = '';
-        if (uniqueNames.length > 0) {
-          hmrAcceptance = `
-if (import.meta.hot) {
-  import.meta.hot.accept();
-}
-`;
-        }
-
-        finalCode = createRootWrapper + '\n' + finalCode + '\n' + proxyInjections + '\n' + hmrAcceptance;
-      }
-
-      return { code: finalCode };
+      return { code: rewrittenCode };
     },
   };
 }

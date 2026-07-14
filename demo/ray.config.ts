@@ -1,7 +1,13 @@
-import { defineConfig } from '@ray/core';
+import { defineConfig, react, svg, mdx, wasm, json, copy } from '@ray/core';
 
 export default defineConfig({
   plugins: [
+    react(),
+    svg(),
+    mdx(),
+    wasm(),
+    json(),
+    copy(),
     {
       name: 'custom:build-time',
       async transform(code, id) {

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { startDevServer } from '@ray/dev-server';
 import { buildProject } from '@ray/core';
 
@@ -168,6 +170,87 @@ if (command === 'dev') {
       process.exit(1);
     }
   })();
+} else if (command === 'create' && args[1] === 'plugin') {
+  const pluginName = args[2] || 'my-plugin';
+  const targetDir = path.resolve(process.cwd(), pluginName);
+
+  console.log(`[Ray CLI] Scaffolding new plugin: ${pluginName} at ${targetDir} ...`);
+
+  fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
+
+  const pkgJson = {
+    name: pluginName,
+    version: '1.0.0',
+    type: 'module',
+    main: './dist/index.js',
+    peerDependencies: {
+      '@ray/core': '>=1.0.0'
+    }
+  };
+
+  const tsconfig = {
+    compilerOptions: {
+      target: 'ESNext',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      esModuleInterop: true,
+      strict: true,
+      skipLibCheck: true
+    },
+    include: ['src/**/*']
+  };
+
+  const srcCode = `import { RayPlugin } from '@ray/core';
+
+export function ${pluginName.replace(/[^a-zA-Z0-9]/g, '')}(): RayPlugin {
+  return {
+    name: '${pluginName}',
+    async transform(code, id) {
+      // Add custom code transformations here
+      return null;
+    }
+  };
+}
+`;
+
+  const testCode = `import { ${pluginName.replace(/[^a-zA-Z0-9]/g, '')} } from './index.js';
+
+describe('${pluginName}', () => {
+  it('should instantiate correctly', () => {
+    const p = ${pluginName.replace(/[^a-zA-Z0-9]/g, '')}();
+    if (p.name !== '${pluginName}') {
+      throw new Error('Plugin name mismatch');
+    }
+    console.log('Test passed!');
+  });
+});
+`;
+
+  const readme = `# ${pluginName}
+
+Ray plugin template.
+
+## Usage
+Add to \`ray.config.ts\`:
+\`\`\`typescript
+import { ${pluginName.replace(/[^a-zA-Z0-9]/g, '')} } from '${pluginName}';
+
+export default defineConfig({
+  plugins: [
+    ${pluginName.replace(/[^a-zA-Z0-9]/g, '')}()
+  ]
+});
+\`\`\`
+`;
+
+  fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
+  fs.writeFileSync(path.join(targetDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2));
+  fs.writeFileSync(path.join(targetDir, 'src/index.ts'), srcCode);
+  fs.writeFileSync(path.join(targetDir, 'src/index.test.ts'), testCode);
+  fs.writeFileSync(path.join(targetDir, 'README.md'), readme);
+
+  console.log(`[Ray CLI] Plugin "${pluginName}" created successfully!`);
+  process.exit(0);
 } else {
   console.log(`
 ⚡ Ray CLI (Milestone 8) ⚡

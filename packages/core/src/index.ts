@@ -24,6 +24,20 @@ export { ModuleNode } from './graph/moduleNode.js';
 export { buildProject } from './build/index.js';
 export { PluginContainer } from './plugin/container.js';
 export { runOptimizer } from './optimizer/index.js';
+
+import { reactPlugin } from './plugin/official/react.js';
+import { svgPlugin } from './plugin/official/svg.js';
+import { mdxPlugin } from './plugin/official/mdx.js';
+import { wasmPlugin } from './plugin/official/wasm.js';
+import { jsonPlugin } from './plugin/official/json.js';
+import { copyPlugin } from './plugin/official/copy.js';
+
+export const react = reactPlugin;
+export const svg = svgPlugin;
+export const mdx = mdxPlugin;
+export const wasm = wasmPlugin;
+export const json = jsonPlugin;
+export const copy = copyPlugin;
 export * from './plugin/index.js';
 
 export class RayCore {
