@@ -27,6 +27,12 @@ if (command === 'dev') {
     analyze: false,
     ssr: false,
     ssg: false,
+    lib: false,
+    entry: undefined as string | undefined,
+    name: undefined as string | undefined,
+    formats: undefined as string | undefined,
+    external: undefined as string | undefined,
+    dts: undefined as boolean | undefined,
   };
 
   // Parse watch, analyze, ssr & ssg boolean flags
@@ -41,6 +47,31 @@ if (command === 'dev') {
   }
   if (args.includes('--ssg')) {
     options.ssg = true;
+  }
+  if (args.includes('--lib')) {
+    options.lib = true;
+  }
+
+  // Parse library mode arguments
+  const entryIdx = args.indexOf('--entry');
+  if (entryIdx !== -1 && args[entryIdx + 1]) {
+    options.entry = args[entryIdx + 1];
+  }
+  const nameIdx = args.indexOf('--name');
+  if (nameIdx !== -1 && args[nameIdx + 1]) {
+    options.name = args[nameIdx + 1];
+  }
+  const formatsIdx = args.indexOf('--formats');
+  if (formatsIdx !== -1 && args[formatsIdx + 1]) {
+    options.formats = args[formatsIdx + 1];
+  }
+  const extIdx = args.indexOf('--external');
+  if (extIdx !== -1 && args[extIdx + 1]) {
+    options.external = args[extIdx + 1];
+  }
+  const dtsIdx = args.indexOf('--dts');
+  if (dtsIdx !== -1 && args[dtsIdx + 1]) {
+    options.dts = args[dtsIdx + 1] !== 'false';
   }
 
   // Parse outDir
@@ -77,6 +108,29 @@ if (command === 'dev') {
   }
   console.log('[Ray CLI] Serving production build preview...');
   startDevServer({ port, preview: true } as any);
+} else if (command === 'inspect' && args.includes('--lib')) {
+  (async () => {
+    try {
+      const { RayCore } = await import('@ray/core');
+      const core = new RayCore(process.cwd());
+      await core.init();
+      const buildConfig = core.config.build || {};
+      const libConfig = buildConfig.lib || {};
+
+      const diagnostics = {
+        entry: libConfig.entry || 'src/index.ts',
+        formats: libConfig.formats || ['esm', 'cjs', 'umd'],
+        externals: libConfig.external || [],
+        types: libConfig.dts !== false,
+      };
+
+      console.log(JSON.stringify(diagnostics, null, 2));
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Inspect command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else {
   console.log(`
 ⚡ Ray CLI (Milestone 8) ⚡

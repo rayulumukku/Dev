@@ -1,0 +1,9 @@
+{
+  "name": "@ray/demo-lib",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

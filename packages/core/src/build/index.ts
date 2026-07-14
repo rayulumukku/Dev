@@ -2,6 +2,7 @@ import { build, context } from 'esbuild';
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { execSync } from 'child_process';
 import { RayCore } from '../index.js';
 
 interface BuildOptions {
@@ -12,18 +13,212 @@ interface BuildOptions {
   analyze: boolean;
   ssr?: boolean;
   ssg?: boolean;
+  lib?: boolean;
+  entry?: string;
+  name?: string;
+  formats?: string;
+  external?: string;
+  dts?: boolean;
 }
 
 /**
  * Executes a production-optimized build of the Ray project.
  * Supports splitting into client browser builds, target Node.js server bundles,
- * and SSG static HTML page compilation.
+ * SSG static HTML page compilation, and reusable Library Mode bundling.
  */
 export async function buildProject(options: BuildOptions) {
   const startTime = Date.now();
   const projectRoot = process.cwd();
   const baseOutDir = path.resolve(projectRoot, options.outDir);
 
+  // Initialize RayCore orchestrator
+  const core = new RayCore(projectRoot);
+  await core.init();
+
+  const configBuild = core.config.build || {};
+  const isLib = !!options.lib || !!configBuild.lib;
+
+  const sourcemapOption =
+    options.sourcemap === 'true' || options.sourcemap === true
+      ? true
+      : options.sourcemap === 'false' || options.sourcemap === false
+      ? false
+      : (options.sourcemap as any);
+
+  // ==========================================
+  // LIBRARY MODE PIPELINE
+  // ==========================================
+  if (isLib) {
+    console.log(`\n[Ray Build] Initiating library build...`);
+    const libConfig = {
+      entry: options.entry || configBuild.lib?.entry || 'src/index.ts',
+      name: options.name || configBuild.lib?.name || 'MyLibrary',
+      formats: options.formats
+        ? (options.formats.split(',') as any[])
+        : configBuild.lib?.formats || ['esm', 'cjs', 'umd'],
+      fileName: configBuild.lib?.fileName,
+      external: options.external
+        ? options.external.split(',')
+        : configBuild.lib?.external || [],
+      dts: options.dts !== undefined ? !!options.dts : configBuild.lib?.dts !== false,
+    };
+
+    const entryFilePath = path.resolve(projectRoot, libConfig.entry);
+    if (!fs.existsSync(entryFilePath)) {
+      throw new Error(`Library entry script not found: ${entryFilePath}`);
+    }
+
+    console.log(`  > Entry:       ${entryFilePath}`);
+    console.log(`  > Name:        ${libConfig.name}`);
+    console.log(`  > Formats:     ${libConfig.formats.join(', ')}`);
+
+    // Detect peerDependencies
+    let peerDeps: string[] = [];
+    const pkgJsonPath = path.join(projectRoot, 'package.json');
+    if (fs.existsSync(pkgJsonPath)) {
+      try {
+        const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+        peerDeps = Object.keys(pkgJson.peerDependencies || {});
+      } catch {}
+    }
+
+    const externals = Array.from(new Set([...peerDeps, ...libConfig.external]));
+
+    const getFileName = (format: string) => {
+      if (typeof libConfig.fileName === 'function') {
+        return libConfig.fileName(format);
+      }
+      if (typeof libConfig.fileName === 'string') {
+        return libConfig.fileName.replace('[format]', format);
+      }
+      return `index.${format}.js`;
+    };
+
+    const reports: any[] = [];
+
+    // Bundle each format
+    for (const format of libConfig.formats) {
+      console.log(`  > Compiling format: ${format}`);
+      const outFileName = getFileName(format);
+      const outFilePath = path.join(baseOutDir, outFileName);
+
+      const isUmd = format === 'umd';
+      const targetFormat = isUmd ? 'iife' : format;
+
+      const banner = configBuild.banner ? { js: configBuild.banner } : undefined;
+      const footer = configBuild.footer ? { js: configBuild.footer } : undefined;
+
+      const esbuildConfig: any = {
+        entryPoints: [entryFilePath],
+        bundle: true,
+        format: targetFormat,
+        globalName: format === 'iife' || isUmd ? libConfig.name : undefined,
+        minify: options.minify,
+        sourcemap: sourcemapOption,
+        write: true,
+        outfile: outFilePath,
+        external: externals,
+        banner,
+        footer,
+        loader: {
+          '.png': 'file',
+          '.jpg': 'file',
+          '.jpeg': 'file',
+          '.gif': 'file',
+          '.svg': 'file',
+          '.woff': 'file',
+          '.woff2': 'file',
+          '.ttf': 'file',
+          '.json': 'json',
+          '.css': 'css',
+        },
+        define: {
+          'process.env.NODE_ENV': '"production"',
+        },
+      };
+
+      await build(esbuildConfig);
+
+      if (isUmd && fs.existsSync(outFilePath)) {
+        let code = fs.readFileSync(outFilePath, 'utf-8');
+        code = `(function (global, factory) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.${libConfig.name} = {}));
+})(this, (function (exports) {
+  ${code}
+}));`;
+        fs.writeFileSync(outFilePath, code);
+      }
+
+      const fileSize = fs.existsSync(outFilePath) ? fs.statSync(outFilePath).size : 0;
+
+      reports.push({
+        format,
+        fileName: outFileName,
+        sizeBytes: fileSize,
+      });
+
+      // Handle standalone stylesheet if esbuild outputs a css file
+      const defaultCssPath = outFilePath.replace(/\.js$/, '.css');
+      if (fs.existsSync(defaultCssPath)) {
+        const cssFileName = configBuild.cssFileName || 'style.css';
+        fs.renameSync(defaultCssPath, path.join(baseOutDir, cssFileName));
+        console.log(`  > Emitted stylesheet: ${cssFileName}`);
+      }
+    }
+
+    // 2. Generate Type Declarations (.d.ts)
+    if (libConfig.dts) {
+      try {
+        console.log(`  > Emitting type declarations (.d.ts) ...`);
+        execSync(`npx tsc --emitDeclarationOnly --declaration --outDir ${baseOutDir}`, {
+          cwd: projectRoot,
+          stdio: 'ignore',
+        });
+      } catch (err) {
+        // Fallback stub declaration file
+        fs.writeFileSync(path.join(baseOutDir, 'index.d.ts'), 'export {};\n');
+      }
+    }
+
+    // 3. Generate package.json inside dist
+    const distPkgJson = {
+      main: `./${getFileName('cjs')}`,
+      module: `./${getFileName('esm')}`,
+      types: `./index.d.ts`,
+      exports: {
+        '.': {
+          import: `./${getFileName('esm')}`,
+          require: `./${getFileName('cjs')}`,
+          types: `./index.d.ts`,
+        },
+      },
+    };
+    fs.writeFileSync(path.join(baseOutDir, 'package.json'), JSON.stringify(distPkgJson, null, 2));
+
+    // 4. Generate library-report.json
+    const declarationCount = fs.existsSync(path.join(baseOutDir, 'index.d.ts')) ? 1 : 0;
+    const libReport = {
+      formats: reports.map((r) => r.format),
+      bundleSizes: reports.reduce((acc, r) => {
+        acc[r.fileName] = `${(r.sizeBytes / 1024).toFixed(2)} KB`;
+        return acc;
+      }, {} as Record<string, string>),
+      externals,
+      exportedSymbols: [libConfig.name],
+      declarationCount,
+    };
+    fs.writeFileSync(path.join(baseOutDir, 'library-report.json'), JSON.stringify(libReport, null, 2));
+
+    const duration = Date.now() - startTime;
+    console.log(`\n⚡ Ray Library Build Completed in ${duration}ms! ⚡`);
+    return;
+  }
+
+  // ==========================================
+  // APP MODE PIPELINE (SPA/SSR/SSG)
+  // ==========================================
   const isSSR = !!options.ssr || !!options.ssg;
   const isSSG = !!options.ssg;
 
@@ -36,10 +231,6 @@ export async function buildProject(options: BuildOptions) {
   if (isSSR) {
     console.log(`  > Server Dir:  ${serverOutDir}`);
   }
-
-  // Initialize RayCore to access the dynamic plugins container
-  const core = new RayCore(projectRoot);
-  await core.init();
 
   const rayEsbuildPlugin = {
     name: 'ray-plugins-bridge',
@@ -97,13 +288,6 @@ export async function buildProject(options: BuildOptions) {
   }
 
   console.log(`  > Client Entry: ${entryFilePath}`);
-
-  const sourcemapOption =
-    options.sourcemap === 'true' || options.sourcemap === true
-      ? true
-      : options.sourcemap === 'false' || options.sourcemap === false
-      ? false
-      : (options.sourcemap as any);
 
   // 2. Client assets compilation configuration
   const clientEsbuildConfig: any = {

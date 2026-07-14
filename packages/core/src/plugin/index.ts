@@ -35,6 +35,31 @@ export interface RayPlugin {
   closeBundle?(this: PluginContext): Promise<void>;
 }
 
-export function defineConfig(config: { plugins?: RayPlugin[] }) {
+export interface LibraryConfig {
+  entry: string;
+  name: string;
+  formats?: ('esm' | 'cjs' | 'umd' | 'iife')[];
+  fileName?: string | ((format: string) => string);
+  external?: string[];
+  dts?: boolean;
+}
+
+export interface BuildConfig {
+  lib?: LibraryConfig;
+  banner?: string;
+  footer?: string;
+  outDir?: string;
+  minify?: boolean;
+  sourcemap?: string | boolean;
+  watch?: boolean;
+  analyze?: boolean;
+}
+
+export interface RayConfig {
+  plugins?: RayPlugin[];
+  build?: BuildConfig;
+}
+
+export function defineConfig(config: RayConfig) {
   return config;
 }
