@@ -10,6 +10,8 @@ import { RayWebSocketServer } from './websocket/index.js';
 import { startFileWatcher } from './watcher/index.js';
 import { injectHmrClient, parseAndRegisterHtmlAssets } from './htmlTransform.js';
 import { compileCssToJs, handleCssDiagnosticsRequest } from './cssMiddleware.js';
+import { handleHmrDiagnosticsRequest } from './hmrMiddleware.js';
+import { planUpdates } from './updatePlanner.js';
 
 interface DevServerOptions {
   port: number;
@@ -64,6 +66,11 @@ export function startDevServer(options: DevServerOptions) {
 
     // Diagnostics: Expose tracked CSS files
     if (handleCssDiagnosticsRequest(ray, pathname, res)) {
+      return;
+    }
+
+    // Diagnostics: Expose HMR boundaries and updates status
+    if (handleHmrDiagnosticsRequest(ray, pathname, res)) {
       return;
     }
 
@@ -202,22 +209,35 @@ export function startDevServer(options: DevServerOptions) {
           timestamp: Date.now(),
         });
       } else {
-        // Broadcast full reload command via WS for all other modifications
-        wsServer.broadcast({
-          type: 'full-reload',
-          path: `/${relPath}`,
-        });
+        // JS/JSX/TS/TSX file change -> plan HMR updates
+        const timestamp = Date.now();
+        const plan = planUpdates(ray, file, timestamp);
+
+        if (plan.fallback) {
+          console.log(`[Ray HMR] HMR fallback triggered: Full reload for /${relPath}`);
+          wsServer.broadcast({
+            type: 'full-reload',
+            path: `/${relPath}`,
+          });
+        } else {
+          console.log(`[Ray HMR] Broadcasting HMR updates for /${relPath}:`, JSON.stringify(plan.updates));
+          wsServer.broadcast({
+            type: 'update',
+            updates: plan.updates,
+          });
+        }
       }
     },
   });
 
   // 5. Listen on specified port
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server (Milestone 4) ⚡\n');
+    console.log('\n  ⚡ Ray Dev Server (Milestone 5) ⚡\n');
     console.log(`  > Local:       http://localhost:${port}/`);
     console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
     console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
     console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
+    console.log(`  > HMR Status:  http://localhost:${port}/__ray/hmr`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 

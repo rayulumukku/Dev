@@ -14,6 +14,8 @@ export class ModuleNode {
   importers = new Set<ModuleNode>();
   /** Timestamp of the last time this module was compiled/transformed */
   lastTransformTime = 0;
+  /** Tracks whether the module accepts its own updates (HMR boundary) */
+  isSelfAccepting = false;
 
   constructor(id: string, file: string, url: string) {
     this.id = id;

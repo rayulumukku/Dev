@@ -144,7 +144,88 @@ export class RayCore {
 
     this.updateDependencies(file, depIds);
 
-    return rewrittenCode;
+    let finalCode = rewrittenCode;
+    const isProjectFile = !file.includes('node_modules');
+
+    if (isProjectFile) {
+      // 1. Inject HotContext at the top of the file
+      const hotContextInjected = `
+if (!import.meta.hot) {
+  import.meta.hot = window.__ray_create_hot_context(import.meta.url);
+}
+`;
+
+      // 2. Intercept react-dom/client createRoot if imported
+      let createRootWrapper = '';
+      if (finalCode.includes('/@modules/react-dom/client')) {
+        // Replace createRoot import with alias
+        finalCode = finalCode.replace(
+          /import\s*\{\s*createRoot\s*\}\s*from\s*["']\/@modules\/react-dom\/client["']/g,
+          'import { createRoot as _createRoot } from "/@modules/react-dom/client"'
+        );
+        createRootWrapper = `
+const createRoot = (container, options) => {
+  const root = _createRoot(container, options);
+  window.__ray_active_roots.add(root);
+  return {
+    render(element) {
+      window.__ray_root_components.set(root, element);
+      root.render(element);
+    },
+    unmount() {
+      window.__ray_active_roots.delete(root);
+      window.__ray_root_components.delete(root);
+      root.unmount();
+    }
+  };
+};
+`;
+      }
+
+      // 3. Detect PascalCase components to wrap in state-preserving proxies
+      const componentNames: string[] = [];
+      const funcRegex = /function\s+([A-Z][a-zA-Z0-9_]*)\b/g;
+      let m;
+      while ((m = funcRegex.exec(finalCode)) !== null) {
+        componentNames.push(m[1]);
+      }
+      const constRegex = /const\s+([A-Z][a-zA-Z0-9_]*)\b/g;
+      while ((m = constRegex.exec(finalCode)) !== null) {
+        componentNames.push(m[1]);
+      }
+
+      const uniqueNames = Array.from(new Set(componentNames));
+      node.isSelfAccepting = uniqueNames.length > 0 || code.includes('import.meta.hot.accept');
+
+      // Rewrite const Component to let Component so we can re-assign them to proxies
+      for (const name of uniqueNames) {
+        const constPattern = new RegExp(`\\bconst\\s+(${name})\\b`, 'g');
+        finalCode = finalCode.replace(constPattern, 'let $1');
+      }
+
+      // Construct proxy registrations
+      let proxyInjections = '';
+      if (uniqueNames.length > 0) {
+        proxyInjections = `\n/* Ray React HMR Component Proxies */\n`;
+        for (const name of uniqueNames) {
+          proxyInjections += `if (typeof ${name} !== 'undefined') {\n  ${name} = window.__ray_register_component(new URL(import.meta.url).pathname, '${name}', ${name});\n}\n`;
+        }
+      }
+
+      // 4. If it contains components, make it a self-accepting HMR module
+      let hmrAcceptance = '';
+      if (uniqueNames.length > 0) {
+        hmrAcceptance = `
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}
+`;
+      }
+
+      finalCode = hotContextInjected + '\n' + createRootWrapper + '\n' + finalCode + '\n' + proxyInjections + '\n' + hmrAcceptance;
+    }
+
+    return finalCode;
   }
 
   /**
