@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { startDevServer } from '@ray/dev-server';
 import { buildProject } from '@ray/core';
+import { runCreateProject } from './create.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -170,37 +171,38 @@ if (command === 'dev') {
       process.exit(1);
     }
   })();
-} else if (command === 'create' && args[1] === 'plugin') {
-  const pluginName = args[2] || 'my-plugin';
-  const targetDir = path.resolve(process.cwd(), pluginName);
+} else if (command === 'create') {
+  if (args[1] === 'plugin') {
+    const pluginName = args[2] || 'my-plugin';
+    const targetDir = path.resolve(process.cwd(), pluginName);
 
-  console.log(`[Ray CLI] Scaffolding new plugin: ${pluginName} at ${targetDir} ...`);
+    console.log(`[Ray CLI] Scaffolding new plugin: ${pluginName} at ${targetDir} ...`);
 
-  fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
 
-  const pkgJson = {
-    name: pluginName,
-    version: '1.0.0',
-    type: 'module',
-    main: './dist/index.js',
-    peerDependencies: {
-      '@ray/core': '>=1.0.0'
-    }
-  };
+    const pkgJson = {
+      name: pluginName,
+      version: '1.0.0',
+      type: 'module',
+      main: './dist/index.js',
+      peerDependencies: {
+        '@ray/core': '>=1.0.0'
+      }
+    };
 
-  const tsconfig = {
-    compilerOptions: {
-      target: 'ESNext',
-      module: 'NodeNext',
-      moduleResolution: 'NodeNext',
-      esModuleInterop: true,
-      strict: true,
-      skipLibCheck: true
-    },
-    include: ['src/**/*']
-  };
+    const tsconfig = {
+      compilerOptions: {
+        target: 'ESNext',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        esModuleInterop: true,
+        strict: true,
+        skipLibCheck: true
+      },
+      include: ['src/**/*']
+    };
 
-  const srcCode = `import { RayPlugin } from '@ray/core';
+    const srcCode = `import { RayPlugin } from '@ray/core';
 
 export function ${pluginName.replace(/[^a-zA-Z0-9]/g, '')}(): RayPlugin {
   return {
@@ -213,7 +215,7 @@ export function ${pluginName.replace(/[^a-zA-Z0-9]/g, '')}(): RayPlugin {
 }
 `;
 
-  const testCode = `import { ${pluginName.replace(/[^a-zA-Z0-9]/g, '')} } from './index.js';
+    const testCode = `import { ${pluginName.replace(/[^a-zA-Z0-9]/g, '')} } from './index.js';
 
 describe('${pluginName}', () => {
   it('should instantiate correctly', () => {
@@ -226,7 +228,7 @@ describe('${pluginName}', () => {
 });
 `;
 
-  const readme = `# ${pluginName}
+    const readme = `# ${pluginName}
 
 Ray plugin template.
 
@@ -243,17 +245,104 @@ export default defineConfig({
 \`\`\`
 `;
 
-  fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
-  fs.writeFileSync(path.join(targetDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2));
-  fs.writeFileSync(path.join(targetDir, 'src/index.ts'), srcCode);
-  fs.writeFileSync(path.join(targetDir, 'src/index.test.ts'), testCode);
-  fs.writeFileSync(path.join(targetDir, 'README.md'), readme);
+    fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify(pkgJson, null, 2));
+    fs.writeFileSync(path.join(targetDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2));
+    fs.writeFileSync(path.join(targetDir, 'src/index.ts'), srcCode);
+    fs.writeFileSync(path.join(targetDir, 'src/index.test.ts'), testCode);
+    fs.writeFileSync(path.join(targetDir, 'README.md'), readme);
 
-  console.log(`[Ray CLI] Plugin "${pluginName}" created successfully!`);
-  process.exit(0);
+    console.log(`[Ray CLI] Plugin "${pluginName}" created successfully!`);
+    process.exit(0);
+  } else {
+    const name = args[1];
+    if (!name) {
+      console.error('Error: Please specify a project name. E.g. ray create my-app');
+      process.exit(1);
+    }
+    const templateIdx = args.indexOf('--template');
+    const template = templateIdx !== -1 && args[templateIdx + 1] ? args[templateIdx + 1] : 'react-ts';
+    try {
+      runCreateProject(process.cwd(), name, template);
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Scaffolding failed:', err.message);
+      process.exit(1);
+    }
+  }
+} else if (command === 'doctor') {
+  (async () => {
+    try {
+      const { runDoctor, printDoctorReport } = await import('@ray/core');
+      const report = await runDoctor(process.cwd());
+      printDoctorReport(report);
+      process.exit(report.nodeOk && report.configOk ? 0 : 1);
+    } catch (err: any) {
+      console.error('Doctor command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'stats') {
+  (async () => {
+    try {
+      const { displayStats } = await import('@ray/core');
+      displayStats(process.cwd());
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Stats command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'benchmark') {
+  (async () => {
+    try {
+      const { runBenchmark } = await import('@ray/core');
+      const runsIdx = args.indexOf('--runs');
+      const runs = runsIdx !== -1 && args[runsIdx + 1] ? parseInt(args[runsIdx + 1], 10) : 5;
+
+      const compareIdx = args.indexOf('--compare');
+      const compare = compareIdx !== -1 ? args[compareIdx + 1] : 'vite,webpack,parcel,rspack';
+
+      const projectIdx = args.indexOf('--project');
+      const project = projectIdx !== -1 ? args[projectIdx + 1] : 'small';
+
+      await runBenchmark(process.cwd(), { runs, compare, project });
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Benchmark command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'verify') {
+  (async () => {
+    try {
+      const { runVerify, printVerifyReport } = await import('@ray/core');
+      const report = await runVerify(process.cwd());
+      printVerifyReport(report);
+      const allOk = report.configOk && report.graphOk && report.cacheOk && report.ssrOk && report.buildOk;
+      process.exit(allOk ? 0 : 1);
+    } catch (err: any) {
+      console.error('Verify command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'release') {
+  (async () => {
+    try {
+      const { runRelease } = await import('@ray/core');
+      const versionIdx = args.indexOf('--version');
+      const version = versionIdx !== -1 && args[versionIdx + 1] ? args[versionIdx + 1] : 'patch';
+      const dryRun = args.includes('--dry-run');
+
+      runRelease(process.cwd(), { version, dryRun });
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Release command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else {
   console.log(`
-⚡ Ray CLI (Milestone 8) ⚡
+ ⚡ Ray CLI (Milestone 14 - Production Hardening) ⚡
 
 Usage:
   ray dev             Start the live dev server
@@ -263,6 +352,9 @@ Usage:
   ray build --ssr     Compile the project for SSR production deployments
   ray build --ssg     Generate static HTML pre-rendered pages (SSG)
   ray preview         Serve static production build from dist/
+  ray create <name>   Scaffold a new project (templates: react, react-ts, react-ssr, library)
+  ray verify          Perform full project diagnostic checks
+  ray release         Publish automation pipeline (bumping version, changelog, tagging)
 
 Options for build:
   --outDir <path>     Specify production output directory (default: dist)

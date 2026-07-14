@@ -40,6 +40,18 @@ export const json = jsonPlugin;
 export const copy = copyPlugin;
 export * from './plugin/index.js';
 
+import { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
+import { displayStats } from './diagnostics/stats.js';
+import { runBenchmark } from './benchmark/index.js';
+import { runRelease } from './diagnostics/release.js';
+import { runVerify, printVerifyReport } from './diagnostics/verify.js';
+
+export { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
+export { displayStats } from './diagnostics/stats.js';
+export { runBenchmark } from './benchmark/index.js';
+export { runRelease } from './diagnostics/release.js';
+export { runVerify, printVerifyReport } from './diagnostics/verify.js';
+
 export class RayCore {
   resolver: Resolver;
   graph: DependencyGraph;

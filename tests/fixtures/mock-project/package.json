@@ -1,0 +1,7 @@
+{
+  "name": "mock-project",
+  "private": true,
+  "dependencies": {
+    "react": "*"
+  }
+}

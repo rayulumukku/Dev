@@ -5,3 +5,11 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+coverage/
+test-results/
+playwright-report/
+.ray/
+benchmark-report.html
+benchmark-report.json
+library-report.json
+build-report.json

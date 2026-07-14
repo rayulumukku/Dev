@@ -12,7 +12,10 @@
     "clean": "tsc --build --clean"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^20.11.24",
+    "@vitest/coverage-v8": "^4.1.10",
     "typescript": "^5.3.3",
-    "@types/node": "^20.11.24"
+    "vitest": "^4.1.10"
   }
 }
