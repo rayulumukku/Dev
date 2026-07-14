@@ -6,6 +6,6 @@
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../transform" }
+    { "path": "../core" }
   ]
 }

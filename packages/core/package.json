@@ -6,5 +6,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "@ray/transform": "*",
+    "es-module-lexer": "^1.4.1",
+    "magic-string": "^0.30.8"
   }
 }

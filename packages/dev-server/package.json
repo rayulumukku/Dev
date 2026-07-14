@@ -8,6 +8,6 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
-    "@ray/transform": "*"
+    "@ray/core": "*"
   }
 }

@@ -1,20 +1,14 @@
 import http from 'http';
 import fs from 'fs/promises';
 import path from 'path';
-import { transformJsx } from '@ray/transform';
+import { RayCore } from '@ray/core';
+import { transformProjectFile } from './transformPipeline.js';
+import { handleModuleRequest, handleDiagnosticsRequest } from './moduleMiddleware.js';
 
 interface DevServerOptions {
   port: number;
 }
 
-// In-memory cache for transformed modules to avoid compiling unchanged files
-interface CachedModule {
-  code: string;
-  mtime: number;
-}
-const transformCache = new Map<string, CachedModule>();
-
-// Standard MIME type mapping for static files
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
   '.css': 'text/css',
@@ -28,31 +22,45 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 /**
- * Starts the Node.js HTTP server that handles static files and transforms JSX on-the-fly.
- * 
- * @param options Server startup options (e.g. port)
+ * Starts the Ray Development Server.
+ * Serves static assets, routes /@modules/ requests to the bare packager,
+ * exposes the /__ray/graph debug route, and transforms JSX/JS imports dynamically.
  */
 export function startDevServer(options: DevServerOptions) {
   const { port } = options;
+  const projectRoot = process.cwd();
+
+  // Initialize RayCore orchestrator
+  const ray = new RayCore(projectRoot);
 
   const server = http.createServer(async (req, res) => {
-    // We only serve GET requests
+    // Only handle GET requests
     if (req.method !== 'GET') {
       res.writeHead(405, { 'Content-Type': 'text/plain' });
       res.end('Method Not Allowed');
       return;
     }
 
-    // Parse the URL path, removing search params and hashing
     const url = new URL(req.url || '/', `http://localhost:${port}`);
-    let pathname = decodeURIComponent(url.pathname);
+    const pathname = decodeURIComponent(url.pathname);
 
-    // Default to serving index.html if requesting root directory
-    if (pathname === '/') {
-      pathname = '/index.html';
+    // 1. Serve dependency graph diagnostics
+    if (handleDiagnosticsRequest(ray, pathname, res)) {
+      return;
     }
 
-    const filePath = path.join(process.cwd(), pathname);
+    // 2. Serve virtual package modules (/@modules/)
+    if (await handleModuleRequest(ray, pathname, res)) {
+      return;
+    }
+
+    // 3. Resolve project files
+    let routePath = pathname;
+    if (routePath === '/') {
+      routePath = '/index.html';
+    }
+
+    const filePath = path.join(projectRoot, routePath);
 
     try {
       const stat = await fs.stat(filePath);
@@ -66,12 +74,11 @@ export function startDevServer(options: DevServerOptions) {
       const ext = path.extname(filePath);
       const mtime = stat.mtimeMs;
 
-      // HTTP Cache Validation (Conditional Requests)
-      // Checks If-Modified-Since header and returns 304 if file hasn't changed.
+      // HTTP Cache Validation (If-Modified-Since)
       const ifModifiedSince = req.headers['if-modified-since'];
       if (ifModifiedSince) {
         const clientTime = new Date(ifModifiedSince).getTime();
-        // Round to nearest second since HTTP dates lose millisecond precision
+        // Match timestamps to nearest second
         if (Math.floor(mtime / 1000) <= Math.floor(clientTime / 1000)) {
           res.writeHead(304);
           res.end();
@@ -79,39 +86,28 @@ export function startDevServer(options: DevServerOptions) {
         }
       }
 
-      // Check if this extension needs to be compiled on the fly
-      const isTransformable = ['.jsx', '.tsx', '.ts'].includes(ext);
+      // Check if file requires specifier rewriting & JSX transform
+      const isTransformable = ['.js', '.jsx', '.ts', '.tsx'].includes(ext);
 
       if (isTransformable) {
-        let compiledCode = '';
-
-        // Check our in-memory cache first
-        const cached = transformCache.get(filePath);
-        if (cached && cached.mtime === mtime) {
-          compiledCode = cached.code;
-        } else {
-          // Cache miss: read, transform, and update cache
-          const rawCode = await fs.readFile(filePath, 'utf-8');
-          compiledCode = await transformJsx(rawCode, filePath);
-          transformCache.set(filePath, { code: compiledCode, mtime });
-          console.log(`[Ray Compiler] Compiled and cached: ${pathname}`);
-        }
+        const rawCode = await fs.readFile(filePath, 'utf-8');
+        const compiledCode = await transformProjectFile(ray, filePath, rawCode, mtime);
 
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
           'Last-Modified': new Date(mtime).toUTCString(),
-          'Cache-Control': 'no-cache', // Instruct browser to revalidate each time
+          'Cache-Control': 'no-cache', // Force client revalidation
         });
         res.end(compiledCode);
       } else {
-        // Serve as static file
+        // Serve static asset directly
         const rawContent = await fs.readFile(filePath);
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
         res.writeHead(200, {
           'Content-Type': contentType,
           'Last-Modified': new Date(mtime).toUTCString(),
-          'Cache-Control': 'no-cache', // Instruct browser to revalidate each time
+          'Cache-Control': 'no-cache', // Force client revalidation
         });
         res.end(rawContent);
       }
@@ -129,10 +125,10 @@ export function startDevServer(options: DevServerOptions) {
   });
 
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server ⚡\n');
-    console.log(`  > Local:   http://localhost:${port}/`);
-    console.log(`  > Mode:    Development (Milestone 1)`);
-    console.log(`  > Root:    ${process.cwd()}\n`);
+    console.log('\n  ⚡ Ray Dev Server (Milestone 2) ⚡\n');
+    console.log(`  > Local:       http://localhost:${port}/`);
+    console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
+    console.log(`  > Root:        ${projectRoot}\n`);
   });
 
   return server;
