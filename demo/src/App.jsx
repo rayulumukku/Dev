@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { message } from 'virtual:foo';
 
 /**
  * Main Application Component for the Ray Dev Server Demo.
@@ -29,6 +30,11 @@ export default function App() {
         <span style={styles.badge}>Milestone 1 Active</span>
         <span style={styles.badge}>Dynamic Compiler</span>
         <span style={styles.badge}>Conditional HTTP Cache</span>
+      </div>
+
+      <div style={{ marginTop: '1.5rem', color: '#94a3b8', fontSize: '0.9rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem' }}>
+        <div>Virtual Module: <span style={{ color: '#38bdf8' }}>{message}</span></div>
+        <div style={{ marginTop: '0.5rem' }}>Build Time: <span style={{ color: '#34d399' }}>__BUILD_TIME__</span></div>
       </div>
     </div>
   );

@@ -4,12 +4,10 @@ import path from 'path';
 import { RayCore } from '@ray/core';
 import { hmrClientCode } from '@ray/hmr-runtime';
 
-import { transformProjectFile, invalidateProjectFile } from './transformPipeline.js';
 import { handleModuleRequest, handleDiagnosticsRequest } from './moduleMiddleware.js';
 import { RayWebSocketServer } from './websocket/index.js';
 import { startFileWatcher } from './watcher/index.js';
-import { injectHmrClient, parseAndRegisterHtmlAssets } from './htmlTransform.js';
-import { compileCssToJs, handleCssDiagnosticsRequest } from './cssMiddleware.js';
+import { handleCssDiagnosticsRequest } from './cssMiddleware.js';
 import { handleHmrDiagnosticsRequest } from './hmrMiddleware.js';
 import { planUpdates } from './updatePlanner.js';
 
@@ -31,14 +29,15 @@ const MIME_TYPES: Record<string, string> = {
 
 /**
  * Launches the HTTP Server, WebSocket Server, and File Watcher.
- * Automatically injects client-side hot reload code into HTML files.
+ * Refactored to coordinate compiles and resolutions entirely via RayCore plugins.
  */
-export function startDevServer(options: DevServerOptions) {
+export async function startDevServer(options: DevServerOptions) {
   const { port } = options;
   const projectRoot = process.cwd();
 
   // 1. Initialize RayCore orchestrator
   const ray = new RayCore(projectRoot);
+  await ray.init();
 
   // 2. Start HTTP server
   const server = http.createServer(async (req, res) => {
@@ -74,6 +73,25 @@ export function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Expose active plugins, hooks, and execution times
+    if (pathname === '/__ray/plugins') {
+      const pluginsInfo = ray.container.plugins.map((p) => {
+        const hooks = Object.keys(p).filter(
+          (k) => k !== 'name' && k !== 'enforce' && typeof (p as any)[k] === 'function'
+        );
+        const duration = ray.container.metrics.get(p.name) || 0;
+        return {
+          name: p.name,
+          hooks,
+          durationMs: Number(duration.toFixed(3)),
+          status: duration > 10 ? 'SLOW (>10ms)' : 'OK',
+        };
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ plugins: pluginsInfo }, null, 2));
+      return;
+    }
+
     // Serve virtual WebSocket HMR client code
     if (pathname === '/@ray/hmr.js') {
       res.writeHead(200, {
@@ -82,6 +100,21 @@ export function startDevServer(options: DevServerOptions) {
       });
       res.end(hmrClientCode);
       return;
+    }
+
+    // Serve virtual modules from loaded plugins
+    if (pathname.startsWith('/@virtual/')) {
+      const virtualId = '\0virtual:' + pathname.slice('/@virtual/'.length).split('?')[0];
+      const loadedCode = await ray.container.load(virtualId);
+      if (loadedCode !== null) {
+        const result = await ray.container.transform(loadedCode, virtualId);
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript',
+          'Cache-Control': 'no-cache',
+        });
+        res.end(result.code);
+        return;
+      }
     }
 
     // Serve virtual packages from /@modules/
@@ -120,18 +153,32 @@ export function startDevServer(options: DevServerOptions) {
         }
       }
 
-      // Check if file requires specifier rewriting & JSX transform
+      // Check if file requires transformations through plugins
       const isTransformable = ['.js', '.jsx', '.ts', '.tsx'].includes(ext);
       const isCss = ext === '.css';
+      const isHtml = ext === '.html';
       const isImport = url.searchParams.has('import');
+      const isAssetImport =
+        isImport &&
+        ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(
+          ext.toLowerCase()
+        );
 
       if (isCss && isImport) {
-        // Compile CSS file into a JavaScript module that dynamically injects the stylesheet
         const rawCode = await fs.readFile(filePath, 'utf-8');
-        const compiledJs = compileCssToJs(rawCode, pathname);
-        // Call ray.transform to register it in the dependency graph
-        const finalCode = await ray.transform(compiledJs, filePath);
+        const finalCode = await ray.transform(rawCode, filePath + '?import');
 
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript',
+          'Last-Modified': new Date(mtime).toUTCString(),
+          'Cache-Control': 'no-cache',
+        });
+        res.end(finalCode);
+        return;
+      }
+
+      if (isAssetImport) {
+        const finalCode = await ray.transform('', filePath + '?import');
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
           'Last-Modified': new Date(mtime).toUTCString(),
@@ -143,28 +190,28 @@ export function startDevServer(options: DevServerOptions) {
 
       if (isTransformable) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
-        const compiledCode = await transformProjectFile(ray, filePath, rawCode, mtime);
+        const finalCode = await ray.transform(rawCode, filePath);
 
         res.writeHead(200, {
           'Content-Type': 'application/javascript',
           'Last-Modified': new Date(mtime).toUTCString(),
           'Cache-Control': 'no-cache',
         });
-        res.end(compiledCode);
+        res.end(finalCode);
+      } else if (isHtml) {
+        const rawCode = await fs.readFile(filePath, 'utf-8');
+        const finalCode = await ray.transform(rawCode, filePath);
+
+        res.writeHead(200, {
+          'Content-Type': 'text/html',
+          'Last-Modified': new Date(mtime).toUTCString(),
+          'Cache-Control': 'no-cache',
+        });
+        res.end(finalCode);
       } else {
         // Serve static asset directly
-        let rawContent = await fs.readFile(filePath);
+        const rawContent = await fs.readFile(filePath);
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
-        // Automatically inject the WS listener script into HTML files
-        if (contentType === 'text/html') {
-          const html = rawContent.toString('utf-8');
-          // Parse HTML and register linked stylesheet assets in dependency graph
-          parseAndRegisterHtmlAssets(html, filePath, ray);
-
-          const injectedHtml = injectHmrClient(html);
-          rawContent = Buffer.from(injectedHtml, 'utf-8');
-        }
 
         res.writeHead(200, {
           'Content-Type': contentType,
@@ -179,7 +226,7 @@ export function startDevServer(options: DevServerOptions) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end(`404 Not Found: ${pathname}`);
       } else {
-        console.error(`[Ray Server] Error serving ${pathname}:`, err);
+        console.error(`[Ray Server] 500 Internal Error serving ${pathname}:`, err);
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end(`Internal Server Error: ${err.message}`);
       }
@@ -196,8 +243,6 @@ export function startDevServer(options: DevServerOptions) {
       const relPath = path.relative(projectRoot, file).replace(/\\/g, '/');
       console.log(`[Ray Watcher] File change detected: /${relPath}`);
 
-      // Invalidate dev-server memory cache
-      invalidateProjectFile(file);
       // Invalidate dependency graph compilation timestamps
       ray.invalidate(file);
 
@@ -232,12 +277,13 @@ export function startDevServer(options: DevServerOptions) {
 
   // 5. Listen on specified port
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server (Milestone 5) ⚡\n');
+    console.log('\n  ⚡ Ray Dev Server (Milestone 7) ⚡\n');
     console.log(`  > Local:       http://localhost:${port}/`);
     console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
     console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
     console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
     console.log(`  > HMR Status:  http://localhost:${port}/__ray/hmr`);
+    console.log(`  > Plugins:     http://localhost:${port}/__ray/plugins`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 

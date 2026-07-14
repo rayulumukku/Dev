@@ -1,0 +1,40 @@
+import { Resolver } from '../resolver/index.js';
+import { DependencyGraph } from '../graph/index.js';
+
+export interface TransformResult {
+  code: string;
+  map?: any;
+}
+
+export interface PluginContext {
+  projectRoot: string;
+  resolver: Resolver;
+  graph: DependencyGraph;
+  logger: Console;
+  buildMode: 'development' | 'production';
+  devServer?: any;
+  watcher?: any;
+  websocket?: any;
+  emitFile(name: string, content: string | Buffer): void;
+  addWatchFile(file: string): void;
+  resolveId(id: string, importer?: string): Promise<string | null>;
+}
+
+export interface RayPlugin {
+  name: string;
+  enforce?: 'pre' | 'post';
+  config?(config: any): void | Promise<void>;
+  configResolved?(config: any): void | Promise<void>;
+  resolveId?(this: PluginContext, id: string, importer?: string): Promise<string | null> | string | null;
+  load?(this: PluginContext, id: string): Promise<string | null> | string | null;
+  transform?(this: PluginContext, code: string, id: string): Promise<TransformResult | string | null> | TransformResult | string | null;
+  handleHotUpdate?(this: PluginContext, ctx: { file: string; timestamp: number }): Promise<void> | void;
+  buildStart?(this: PluginContext): Promise<void>;
+  buildEnd?(this: PluginContext): Promise<void>;
+  generateBundle?(this: PluginContext, bundle: any): Promise<void>;
+  closeBundle?(this: PluginContext): Promise<void>;
+}
+
+export function defineConfig(config: { plugins?: RayPlugin[] }) {
+  return config;
+}
