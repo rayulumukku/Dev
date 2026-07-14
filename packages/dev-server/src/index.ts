@@ -8,7 +8,8 @@ import { transformProjectFile, invalidateProjectFile } from './transformPipeline
 import { handleModuleRequest, handleDiagnosticsRequest } from './moduleMiddleware.js';
 import { RayWebSocketServer } from './websocket/index.js';
 import { startFileWatcher } from './watcher/index.js';
-import { injectHmrClient } from './htmlTransform.js';
+import { injectHmrClient, parseAndRegisterHtmlAssets } from './htmlTransform.js';
+import { compileCssToJs, handleCssDiagnosticsRequest } from './cssMiddleware.js';
 
 interface DevServerOptions {
   port: number;
@@ -61,6 +62,11 @@ export function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Expose tracked CSS files
+    if (handleCssDiagnosticsRequest(ray, pathname, res)) {
+      return;
+    }
+
     // Serve virtual WebSocket HMR client code
     if (pathname === '/@ray/hmr.js') {
       res.writeHead(200, {
@@ -109,6 +115,24 @@ export function startDevServer(options: DevServerOptions) {
 
       // Check if file requires specifier rewriting & JSX transform
       const isTransformable = ['.js', '.jsx', '.ts', '.tsx'].includes(ext);
+      const isCss = ext === '.css';
+      const isImport = url.searchParams.has('import');
+
+      if (isCss && isImport) {
+        // Compile CSS file into a JavaScript module that dynamically injects the stylesheet
+        const rawCode = await fs.readFile(filePath, 'utf-8');
+        const compiledJs = compileCssToJs(rawCode, pathname);
+        // Call ray.transform to register it in the dependency graph
+        const finalCode = await ray.transform(compiledJs, filePath);
+
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript',
+          'Last-Modified': new Date(mtime).toUTCString(),
+          'Cache-Control': 'no-cache',
+        });
+        res.end(finalCode);
+        return;
+      }
 
       if (isTransformable) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
@@ -128,6 +152,9 @@ export function startDevServer(options: DevServerOptions) {
         // Automatically inject the WS listener script into HTML files
         if (contentType === 'text/html') {
           const html = rawContent.toString('utf-8');
+          // Parse HTML and register linked stylesheet assets in dependency graph
+          parseAndRegisterHtmlAssets(html, filePath, ray);
+
           const injectedHtml = injectHmrClient(html);
           rawContent = Buffer.from(injectedHtml, 'utf-8');
         }
@@ -167,20 +194,30 @@ export function startDevServer(options: DevServerOptions) {
       // Invalidate dependency graph compilation timestamps
       ray.invalidate(file);
 
-      // Broadcast full reload command via WS
-      wsServer.broadcast({
-        type: 'full-reload',
-        path: `/${relPath}`,
-      });
+      // Check if this is a CSS stylesheet change to send CSS-specific update
+      if (file.endsWith('.css')) {
+        wsServer.broadcast({
+          type: 'css-update',
+          path: `/${relPath}`,
+          timestamp: Date.now(),
+        });
+      } else {
+        // Broadcast full reload command via WS for all other modifications
+        wsServer.broadcast({
+          type: 'full-reload',
+          path: `/${relPath}`,
+        });
+      }
     },
   });
 
   // 5. Listen on specified port
   server.listen(port, () => {
-    console.log('\n  ⚡ Ray Dev Server (Milestone 3) ⚡\n');
+    console.log('\n  ⚡ Ray Dev Server (Milestone 4) ⚡\n');
     console.log(`  > Local:       http://localhost:${port}/`);
     console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
     console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
+    console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 

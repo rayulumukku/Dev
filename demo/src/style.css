@@ -1,0 +1,6 @@
+/* Custom dynamic stylesheet served via Ray */
+.card-dynamic {
+  border: 1px solid rgba(99, 102, 241, 0.4) !important;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.3) !important;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

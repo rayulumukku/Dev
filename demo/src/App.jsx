@@ -8,7 +8,7 @@ export default function App() {
   const [count, setCount] = useState(0);
 
   return (
-    <div style={styles.card}>
+    <div style={styles.card} className="card-dynamic">
       <h1 style={styles.title}>Ray Dev Server</h1>
       <p style={styles.subtitle}>
         JSX files are transformed dynamically on request into native ES Modules.

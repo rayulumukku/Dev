@@ -117,13 +117,15 @@ export class RayCore {
           const resolvedPath = this.resolve(specifier, file);
           depIds.add(resolvedPath);
 
+          const isCss = resolvedPath.endsWith('.css');
+
           if (resolvedPath.includes('node_modules')) {
             // Rewrite bare module imports to the virtual /@modules/ path
-            rewrittenSpecifier = `/@modules/${specifier}`;
+            rewrittenSpecifier = `/@modules/${specifier}${isCss ? '?import' : ''}`;
           } else {
             // Rewrite project files to their served URLs
             const rel = path.relative(this.projectRoot, resolvedPath).replace(/\\/g, '/');
-            rewrittenSpecifier = `/${rel}`;
+            rewrittenSpecifier = `/${rel}${isCss ? '?import' : ''}`;
           }
         } catch (err) {
           console.error(`[Ray Core] Error resolving specifier "${specifier}" in file "${file}":`, err);
