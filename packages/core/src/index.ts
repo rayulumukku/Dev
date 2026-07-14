@@ -13,6 +13,8 @@ import { cssPlugin } from './plugin/builtins/cssPlugin.js';
 import { htmlPlugin } from './plugin/builtins/htmlPlugin.js';
 import { assetsPlugin } from './plugin/builtins/assetsPlugin.js';
 import { hmrPlugin } from './plugin/builtins/hmrPlugin.js';
+import { envPlugin } from './plugin/builtins/envPlugin.js';
+import { loadEnv } from './plugin/env.js';
 import { PluginContext } from './plugin/index.js';
 
 export { Resolver } from './resolver/index.js';
@@ -28,21 +30,31 @@ export class RayCore {
   projectRoot: string;
   container!: PluginContainer;
   config: any = { plugins: [] };
+  mode: string;
+  env: Record<string, string> = {};
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, mode = 'development') {
     this.projectRoot = projectRoot;
     this.resolver = new Resolver(projectRoot);
     this.graph = new DependencyGraph();
+    this.mode = mode;
   }
 
   /**
-   * Initializes the plugin platform, parsing configuration, and assembling the plugin container.
+   * Initializes the plugin platform, parsing configuration, loading environments, and assembling the container.
    */
   async init() {
     this.config = await loadConfig(this.projectRoot);
     const userPlugins = this.config.plugins || [];
 
+    const finalMode = this.mode || this.config.mode || 'development';
+    this.mode = finalMode;
+
+    const envPrefix = this.config.envPrefix || 'RAY_';
+    this.env = loadEnv(finalMode, this.projectRoot, envPrefix);
+
     const builtinPlugins = [
+      envPlugin(this.env, finalMode, envPrefix, this.config.define || {}),
       hmrPlugin(),
       jsxPlugin(),
       cssPlugin(),

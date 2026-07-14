@@ -19,6 +19,7 @@ interface BuildOptions {
   formats?: string;
   external?: string;
   dts?: boolean;
+  mode?: string;
 }
 
 /**
@@ -32,7 +33,7 @@ export async function buildProject(options: BuildOptions) {
   const baseOutDir = path.resolve(projectRoot, options.outDir);
 
   // Initialize RayCore orchestrator
-  const core = new RayCore(projectRoot);
+  const core = new RayCore(projectRoot, options.mode || 'production');
   await core.init();
 
   const configBuild = core.config.build || {};

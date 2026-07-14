@@ -14,6 +14,7 @@ import { planUpdates } from './updatePlanner.js';
 interface DevServerOptions {
   port: number;
   ssr?: boolean;
+  mode?: string;
 }
 
 let lastRenderTime = 0;
@@ -51,7 +52,7 @@ export async function startDevServer(options: DevServerOptions) {
   }
 
   // 1. Initialize RayCore orchestrator
-  const ray = isPreview ? null : new RayCore(projectRoot);
+  const ray = isPreview ? null : new RayCore(projectRoot, options.mode || 'development');
   if (ray) {
     await ray.init();
   }
@@ -153,6 +154,17 @@ export async function startDevServer(options: DevServerOptions) {
         streaming: true,
         hydration: true,
         renderTimeMs: Number(lastRenderTime.toFixed(2)),
+      }, null, 2));
+      return;
+    }
+
+    // Diagnostics: Expose environment configuration
+    if (pathname === '/__ray/env') {
+      const clientVars = ray ? Object.keys(ray.env).filter(k => k.startsWith(ray.config.envPrefix || 'RAY_')) : [];
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        mode: ray ? ray.mode : 'development',
+        clientVariables: clientVars
       }, null, 2));
       return;
     }
@@ -354,8 +366,24 @@ export async function startDevServer(options: DevServerOptions) {
     ? null
     : startFileWatcher({
         projectRoot,
-        onChange: (file) => {
+        onChange: async (file) => {
           const relPath = path.relative(projectRoot, file).replace(/\\/g, '/');
+
+          // Hot Reload environmental configurations when edited during development
+          if (file.includes('.env')) {
+            console.log(`[Ray Watcher] Environment file change detected: /${relPath}`);
+            if (ray) {
+              await ray.init();
+            }
+            if (wsServer) {
+              wsServer.broadcast({
+                type: 'full-reload',
+                path: `/${relPath}`,
+              });
+            }
+            return;
+          }
+
           console.log(`[Ray Watcher] File change detected: /${relPath}`);
 
           // Invalidate dependency graph compilation timestamps

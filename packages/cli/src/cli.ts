@@ -4,6 +4,13 @@ import { buildProject } from '@ray/core';
 const args = process.argv.slice(2);
 const command = args[0];
 
+// Resolve mode override flag
+let mode = 'development';
+const modeIdx = args.indexOf('--mode');
+if (modeIdx !== -1 && args[modeIdx + 1]) {
+  mode = args[modeIdx + 1];
+}
+
 if (command === 'dev') {
   let port = 3000;
 
@@ -17,8 +24,14 @@ if (command === 'dev') {
   }
 
   const ssr = args.includes('--ssr');
-  startDevServer({ port, ssr });
+  startDevServer({ port, ssr, mode });
 } else if (command === 'build') {
+  let buildMode = 'production';
+  const modeIdx = args.indexOf('--mode');
+  if (modeIdx !== -1 && args[modeIdx + 1]) {
+    buildMode = args[modeIdx + 1];
+  }
+
   const options = {
     outDir: 'dist',
     minify: true,
@@ -33,6 +46,7 @@ if (command === 'dev') {
     formats: undefined as string | undefined,
     external: undefined as string | undefined,
     dts: undefined as boolean | undefined,
+    mode: buildMode,
   };
 
   // Parse watch, analyze, ssr & ssg boolean flags
