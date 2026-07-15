@@ -1,8 +1,7 @@
-import { RayPlugin, PluginContext } from '../index.js';
+import { RayPlugin } from '../index.js';
 import { transformJsx } from '@ray/transform';
-import { init, parse } from 'es-module-lexer';
-import MagicString from 'magic-string';
 import path from 'path';
+import { Lexer, Parser, ASTVisitor, CodeGenerator } from '../../compiler/index.js';
 
 function resolve(specifier: string, importer: string, resolver: any, projectRoot: string): string {
   if (specifier.startsWith('.') || specifier.startsWith('..')) {
@@ -18,55 +17,40 @@ function resolve(specifier: string, importer: string, resolver: any, projectRoot
   return resolver.resolveBarePackage(specifier, path.dirname(importer));
 }
 
-/**
- * Builtin plugin for compiling JSX/TSX/TS files, rewriting import/export specifiers,
- * and wrapping components in HMR proxies.
- */
 export function jsxPlugin(): RayPlugin {
   return {
     name: 'ray:jsx',
+    async transform(code: any, id: string) {
+      if (!['.js', '.jsx', '.ts', '.tsx'].some(ext => id.endsWith(ext))) {
+        return null;
+      }
 
-    async transform(this: PluginContext, code, id) {
-      const ext = path.extname(id);
-      const isJsxOrTs = ['.js', '.jsx', '.ts', '.tsx'].includes(ext);
-      if (!isJsxOrTs) return null;
+      // Check config setting
+      const configCompiler = (globalThis as any).__ray_cache_store?.config?.compiler || 'auto';
 
-      await init;
+      let ast = (code && typeof code === 'object' && code.type) ? code : null;
+      const rawCode = ast ? code.toString() : code;
 
-      // 1. Compile JSX/TS
-      let jsCode = code;
-      const isTransformable = ['.jsx', '.tsx', '.ts'].includes(ext);
-      if (isTransformable) {
-        const configCompiler = (globalThis as any).__ray_config_compiler || 'auto';
+      // 1. Process JSX compilation
+      let jsCode = '';
+      if (configCompiler === 'ray') {
+        const compiler = new (await import('../../compiler/index.js')).RayCompiler((globalThis as any).__ray_cache_store?.env || {});
+        const res = compiler.compile(rawCode, id);
+        jsCode = res.code;
+        // Parse the generated code to continue AST transforms
+        const parser = new Parser(new Lexer(jsCode).tokenize());
+        ast = parser.parse();
+      } else {
+        // Fallback or Auto mode
         let compiledResult = null;
-
-        if (configCompiler === 'ray' || configCompiler === 'auto') {
+        if (configCompiler === 'auto') {
           try {
-            const { RayCompiler } = await import('../../compiler/index.js');
-            const compiler = new RayCompiler((globalThis as any).__ray_cache_store?.env || {});
-            const res = compiler.compile(code, id);
+            const compiler = new (await import('../../compiler/index.js')).RayCompiler((globalThis as any).__ray_cache_store?.env || {});
+            const res = compiler.compile(rawCode, id);
             compiledResult = res.code;
-
-            // Record compiler stats
-            if (!(globalThis as any).__ray_compiler_stats) {
-              (globalThis as any).__ray_compiler_stats = {
-                backend: 'ray',
-                astNodes: 0,
-                parseTimeMs: 0,
-                transformTimeMs: 0,
-                emitTimeMs: 0
-              };
-            }
-            const stats = (globalThis as any).__ray_compiler_stats;
-            stats.backend = 'ray';
-            stats.astNodes += res.astNodesCount;
-            stats.parseTimeMs += res.parseTimeMs;
-            stats.transformTimeMs += res.transformTimeMs;
-            stats.emitTimeMs += res.emitTimeMs;
+            const parser = new Parser(new Lexer(compiledResult).tokenize());
+            ast = parser.parse();
           } catch (err: any) {
-            if (configCompiler === 'ray') {
-              throw err;
-            }
             console.warn(`[Ray Compiler] Compilation failed for ${id}, falling back to esbuild compatibility mode:`, err.message);
           }
         }
@@ -74,75 +58,63 @@ export function jsxPlugin(): RayPlugin {
         if (compiledResult !== null) {
           jsCode = compiledResult;
         } else {
-          jsCode = await transformJsx(code, id);
-          if (!(globalThis as any).__ray_compiler_stats) {
-            (globalThis as any).__ray_compiler_stats = {
-              backend: 'esbuild',
-              astNodes: 0,
-              parseTimeMs: 0,
-              transformTimeMs: 0,
-              emitTimeMs: 0
-            };
-          }
-          (globalThis as any).__ray_compiler_stats.backend = 'esbuild';
+          jsCode = await transformJsx(rawCode, id);
+          return { code: jsCode };
         }
       }
 
-      // 2. Parse and rewrite imports/exports
-      const [imports] = parse(jsCode);
-      const s = new MagicString(jsCode);
+      // 2. Rewrite imports/exports using AST Visitor instead of MagicString
       const depIds = new Set<string>();
+      const visitor = new ASTVisitor({
+        ImportDeclaration: (node: any) => {
+          const specifier = node.source.value;
+          if (specifier) {
+            let rewrittenSpecifier = specifier;
+            try {
+              const pluginResolved = specifier.startsWith('\0virtual:') ? specifier : null;
+              let resolvedPath = pluginResolved !== null ? pluginResolved : resolve(specifier, id, this.resolver, this.projectRoot);
+              depIds.add(resolvedPath);
 
-      for (const imp of imports) {
-        const specifier = imp.n;
-        if (specifier) {
-          let rewrittenSpecifier = specifier;
-          try {
-            // First check if any plugin resolveId hook resolves the specifier (e.g., virtual modules)
-            const pluginResolved = await this.resolveId(specifier, id);
-            let resolvedPath = '';
-
-            if (pluginResolved !== null) {
-              resolvedPath = pluginResolved;
-            } else {
-              resolvedPath = resolve(specifier, id, this.resolver, this.projectRoot);
-            }
-
-            depIds.add(resolvedPath);
-
-            if (resolvedPath.startsWith('\0virtual:')) {
-              // Rewrite virtual modules to virtual namespaces served by dev-server
-              const virtName = resolvedPath.slice('\0virtual:'.length);
-              rewrittenSpecifier = `/@virtual/${virtName}?import`;
-            } else if (resolvedPath.includes('node_modules')) {
-              const idx = resolvedPath.indexOf('node_modules');
-              const rel = resolvedPath.slice(idx + 'node_modules/'.length).replace(/\\/g, '/');
-              rewrittenSpecifier = `/@modules/${rel}`;
-            } else {
-              const rel = path.relative(this.projectRoot, resolvedPath).replace(/\\/g, '/');
-              rewrittenSpecifier = '/' + rel;
-              const isCss = path.extname(resolvedPath) === '.css';
-              const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(path.extname(resolvedPath).toLowerCase());
-              if (isCss || isAsset) {
-                rewrittenSpecifier += '?import';
+              if (resolvedPath.startsWith('\0virtual:')) {
+                const virtName = resolvedPath.slice('\0virtual:'.length);
+                rewrittenSpecifier = `/@virtual/${virtName}?import`;
+              } else if (resolvedPath.includes('node_modules')) {
+                const idx = resolvedPath.indexOf('node_modules');
+                const rel = resolvedPath.slice(idx + 'node_modules/'.length).replace(/\\/g, '/');
+                rewrittenSpecifier = `/@modules/${rel}`;
+              } else {
+                const rel = path.relative(this.projectRoot, resolvedPath).replace(/\\/g, '/');
+                rewrittenSpecifier = '/' + rel;
+                const isCss = path.extname(resolvedPath) === '.css';
+                const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(path.extname(resolvedPath).toLowerCase());
+                if (isCss || isAsset) {
+                  rewrittenSpecifier += '?import';
+                }
               }
+            } catch (err: any) {
+              this.logger.error(`[Ray JSX Plugin] Resolving error for "${specifier}" in "${id}": ${err.message}`);
             }
-          } catch (err: any) {
-            this.logger.error(`[Ray JSX Plugin] Resolving error for "${specifier}" in "${id}": ${err.message}`);
+
+            node.source.value = rewrittenSpecifier;
+            node.source.raw = JSON.stringify(rewrittenSpecifier);
           }
-
-          s.overwrite(imp.s, imp.e, rewrittenSpecifier);
+          return node;
         }
-      }
+      });
 
-      const rewrittenCode = s.toString();
+      // Bind resolveId context to visitor callbacks
+      (visitor as any).resolveId = this.resolveId.bind(this);
+      (visitor as any).resolver = this.resolver;
+      (visitor as any).projectRoot = this.projectRoot;
+      (visitor as any).logger = this.logger;
+
+      await visitor.traverse(ast);
 
       // 3. Register module and update graph links
       const relativeUrl = '/' + path.relative(this.projectRoot, id).replace(/\\/g, '/');
-      const node = this.graph.registerModule(id, id, relativeUrl);
-      node.lastTransformTime = Date.now();
+      const graphNode = this.graph.registerModule(id, id, relativeUrl);
+      graphNode.lastTransformTime = Date.now();
 
-      // Helper to update dependencies inside context
       this.graph.updateDependencies(id, depIds, (depId: string) => {
         let depUrl = '';
         if (depId.includes('\0virtual:')) {
@@ -158,7 +130,7 @@ export function jsxPlugin(): RayPlugin {
         return { file: depId, url: depUrl };
       });
 
-      return { code: rewrittenCode };
+      return ast;
     },
   };
 }

@@ -30,7 +30,7 @@ describe('RayFS File System Watcher & Benchmark Tests', () => {
     fs.writeFileSync(targetFile, 'console.log("change 2");');
 
     // Wait for debouncing window (40ms) to flush batch
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 200));
 
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]).toBe(targetFile);

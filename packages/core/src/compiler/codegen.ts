@@ -152,11 +152,13 @@ export class CodeGenerator {
           if (nonDefaultSpecs[0].type === NodeType.ImportNamespaceSpecifier) {
             importsPart += specStrs.find((s: string) => s.startsWith('*')) || '';
           } else {
-            importsPart += `{${space}${nonDefaultSpecs.map((s: any) => {
-              const parts = s.split(/\s+/);
-              if (parts.length === 3) return `${parts[0]}${space}as${space}${parts[2]}`;
-              return parts[0];
-            }).join(`,${space}`)}${space}}`;
+            const specifiersPart = nonDefaultSpecs.map((spec: any) => {
+              const imported = this.generate(spec.imported);
+              const local = this.generate(spec.local);
+              if (imported === local) return imported;
+              return `${imported}${space}as${space}${local}`;
+            }).join(`,${space}`);
+            importsPart += `{${space}${specifiersPart}${space}}`;
           }
         }
 

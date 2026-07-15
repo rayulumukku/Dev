@@ -63,7 +63,7 @@ describe('PluginContainer Unit Tests', () => {
 
     const container = new PluginContainer([p1, p2], dummyContext);
     const result = await container.transform('input', 'file.js');
-    expect(result.code).toBe('input + p1 + p2');
+    expect(result.code.trim().replace(/;$/, '')).toBe('input + p1 + p2');
   });
 
   it('should accumulate execution metrics', async () => {

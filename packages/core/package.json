@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@ray/transform": "*",
-    "es-module-lexer": "^1.4.1",
-    "magic-string": "^0.30.8"
+    "es-module-lexer": "^1.4.1"
   }
 }
