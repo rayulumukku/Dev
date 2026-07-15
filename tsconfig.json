@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/fs" },
+    { "path": "./packages/compiler-rust" },
     { "path": "./packages/core" },
     { "path": "./packages/transform" },
     { "path": "./packages/dev-server" },

@@ -1,5 +1,5 @@
 {
-  "name": "@ray/core",
+  "name": "@ray/compiler-rust",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -7,9 +7,11 @@
   "exports": {
     ".": "./dist/index.js"
   },
-  "dependencies": {
-    "@ray/compiler-rust": "*",
-    "@ray/transform": "*",
-    "es-module-lexer": "^1.4.1"
+  "napi": {
+    "name": "ray-compiler-rust"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
   }
 }
