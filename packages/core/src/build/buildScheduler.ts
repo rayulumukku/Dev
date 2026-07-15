@@ -202,7 +202,7 @@ export class BuildScheduler {
       const chunks = await this.runGroup(group, options);
       for (const chunk of chunks) {
         allChunks.push(chunk);
-        perFile[chunk.file] = { code: chunk.code, map: chunk.map };
+        perFile[chunk.file] = { code: chunk.code, map: typeof chunk.map === 'string' ? chunk.map : chunk.map ? JSON.stringify(chunk.map) : undefined };
       }
     }
 

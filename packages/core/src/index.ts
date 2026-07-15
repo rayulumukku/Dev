@@ -3,7 +3,6 @@ import path from 'path';
 import { Resolver, parseSpecifier } from './resolver/index.js';
 import { DependencyGraph } from './graph/index.js';
 import { ModuleNode } from './graph/moduleNode.js';
-import { build } from 'esbuild';
 import { pathToFileURL } from 'url';
 
 import { loadConfig } from './plugin/config.js';
@@ -68,6 +67,26 @@ export { DistributedBuildExecutor } from './build/remoteExecutor.js';
 export { Scope, ScopeAnalyzer } from './compiler/scope.js';
 export { ASTVisitor } from './compiler/visitor.js';
 export { transformCjsToEsm } from './compiler/index.js';
+
+// ─── Parallel Scheduler & Bundler ───────────────────────────────────────────
+export { ChunkMerger } from './build/chunkMerger.js';
+export { RayBundler } from './build/rayBundler.js';
+
+// ─── Application Platform — Runtime ─────────────────────────────────────────
+export { RuntimeAdapter } from './runtime/index.js';
+
+// ─── Application Platform — Live Tooling ────────────────────────────────────
+export { LiveASTViewer, liveASTViewer } from './live/astViewer.js';
+export { VisualPluginDebugger, pluginDebugger } from './live/pluginDebugger.js';
+
+// ─── Application Platform — Auto Optimisations ───────────────────────────────
+export { AutoBundleSplitter } from './platform/bundleSplitter.js';
+export { AutoLazyLoader } from './platform/lazyLoader.js';
+
+// ─── Application Platform — AI Features ─────────────────────────────────────
+export { CompilerSuggestions } from './ai/compilerSuggestions.js';
+export { StaticPerformanceAnalyzer } from './ai/staticPerformanceAnalyzer.js';
+
 
 export class RayCore {
   resolver: Resolver;
@@ -320,19 +339,19 @@ export class RayCore {
       }
     }
 
-    const result = await build({
-      entryPoints: [resolvedPath],
-      bundle: true,
+    // Bundle via RayBundler (no esbuild)
+    const { RayBundler } = await import('./build/rayBundler.js');
+    const bundler = new RayBundler(this.projectRoot);
+    const tmpOut = path.join(this.projectRoot, '.ray', `pkg.${Date.now()}.js`);
+    fs.mkdirSync(path.dirname(tmpOut), { recursive: true });
+    const output = await bundler.bundle({
+      entryPoint: resolvedPath,
+      outFile: tmpOut,
       format: 'esm',
       external: externals,
-      write: false
     });
-
-    if (!result.outputFiles || result.outputFiles.length === 0) {
-      throw new Error(`Bundling failed for bare package: ${specifier}`);
-    }
-
-    return result.outputFiles[0].text;
+    try { fs.unlinkSync(tmpOut); } catch {}
+    return output.code;
   }
 
   /**
@@ -361,23 +380,16 @@ export class RayCore {
       }
     };
 
-    await build({
-      entryPoints: [filePath],
-      bundle: true,
-      platform: 'node',
+    // Bundle via RayBundler for SSR — outputs an ES module compatible with Node
+    const { RayBundler } = await import('./build/rayBundler.js');
+    const ssrBundler = new RayBundler(this.projectRoot);
+    const bundleOut = await ssrBundler.bundle({
+      entryPoint: filePath,
+      outFile: tempOut,
       format: 'esm',
-      outfile: tempOut,
-      write: true,
-      plugins: [ssrVirtualPlugin],
-      external: [
-        'react',
-        'react-dom',
-        'react-dom/server',
-        'react-router-dom',
-        'react-router-dom/server',
-        'react-router'
-      ],
+      external: ['react', 'react-dom', 'react-dom/server', 'react-router-dom', 'react-router-dom/server', 'react-router'],
     });
+    void bundleOut;
 
     try {
       const fileUrl = pathToFileURL(tempOut).toString() + `?t=${Date.now()}`;

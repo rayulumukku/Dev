@@ -303,9 +303,9 @@ export async function buildProject(options: BuildOptions) {
       manifest[srcFile] = {
         file: destFile,
         css: [],
-        imports: (outputMeta.imports || [])
-          .filter((imp) => imp.path.endsWith('.js'))
-          .map((imp) => path.relative(clientOutDir, imp.path).replace(/\\/g, '/')),
+        imports: ((outputMeta.imports || []) as any[])
+          .filter((imp: any) => imp.path?.endsWith('.js'))
+          .map((imp: any) => path.relative(clientOutDir, imp.path).replace(/\\/g, '/')),
       };
     }
   }
