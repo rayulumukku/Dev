@@ -48,6 +48,7 @@ import { runVerify, printVerifyReport } from './diagnostics/verify.js';
 import { studio } from './diagnostics/studioApi.js';
 import { CompilerCacheStore } from './diagnostics/cacheStore.js';
 import { BuildScheduler } from './build/buildScheduler.js';
+import { RayCompiler } from './compiler/index.js';
 
 export { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
 export { displayStats } from './diagnostics/stats.js';
@@ -57,6 +58,7 @@ export { runVerify, printVerifyReport } from './diagnostics/verify.js';
 export { studio } from './diagnostics/studioApi.js';
 export { CompilerCacheStore } from './diagnostics/cacheStore.js';
 export { BuildScheduler } from './build/buildScheduler.js';
+export { RayCompiler } from './compiler/index.js';
 
 export class RayCore {
   resolver: Resolver;
@@ -68,6 +70,7 @@ export class RayCore {
   env: Record<string, string> = {};
   optimizerResult: any = null;
   cacheStore: CompilerCacheStore;
+  compilerEngine!: RayCompiler;
 
   constructor(projectRoot: string, mode = 'development') {
     this.projectRoot = projectRoot;
@@ -89,6 +92,9 @@ export class RayCore {
 
     const envPrefix = this.config.envPrefix || 'RAY_';
     this.env = loadEnv(finalMode, this.projectRoot, envPrefix);
+
+    this.compilerEngine = new RayCompiler(this.env);
+    (globalThis as any).__ray_config_compiler = this.config.compiler || 'auto';
 
     const globalHash = this.cacheStore.computeGlobalHash(this.mode, this.config);
     this.cacheStore.load(globalHash);

@@ -235,6 +235,20 @@ export async function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Serve native compiler telemetry metrics
+    if (pathname === '/__ray/compiler') {
+      const stats = (globalThis as any).__ray_compiler_stats || {
+        backend: (globalThis as any).__ray_config_compiler || 'esbuild',
+        astNodes: 0,
+        parseTimeMs: 0,
+        transformTimeMs: 0,
+        emitTimeMs: 0
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(stats, null, 2));
+      return;
+    }
+
     // Diagnostics: Expose full runtime diagnostics snapshot
     if (pathname === '/__ray/studio/diagnostics') {
       const memory = process.memoryUsage();

@@ -37,7 +37,55 @@ export function jsxPlugin(): RayPlugin {
       let jsCode = code;
       const isTransformable = ['.jsx', '.tsx', '.ts'].includes(ext);
       if (isTransformable) {
-        jsCode = await transformJsx(code, id);
+        const configCompiler = (globalThis as any).__ray_config_compiler || 'auto';
+        let compiledResult = null;
+
+        if (configCompiler === 'ray' || configCompiler === 'auto') {
+          try {
+            const { RayCompiler } = await import('../../compiler/index.js');
+            const compiler = new RayCompiler((globalThis as any).__ray_cache_store?.env || {});
+            const res = compiler.compile(code, id);
+            compiledResult = res.code;
+
+            // Record compiler stats
+            if (!(globalThis as any).__ray_compiler_stats) {
+              (globalThis as any).__ray_compiler_stats = {
+                backend: 'ray',
+                astNodes: 0,
+                parseTimeMs: 0,
+                transformTimeMs: 0,
+                emitTimeMs: 0
+              };
+            }
+            const stats = (globalThis as any).__ray_compiler_stats;
+            stats.backend = 'ray';
+            stats.astNodes += res.astNodesCount;
+            stats.parseTimeMs += res.parseTimeMs;
+            stats.transformTimeMs += res.transformTimeMs;
+            stats.emitTimeMs += res.emitTimeMs;
+          } catch (err: any) {
+            if (configCompiler === 'ray') {
+              throw err;
+            }
+            console.warn(`[Ray Compiler] Compilation failed for ${id}, falling back to esbuild compatibility mode:`, err.message);
+          }
+        }
+
+        if (compiledResult !== null) {
+          jsCode = compiledResult;
+        } else {
+          jsCode = await transformJsx(code, id);
+          if (!(globalThis as any).__ray_compiler_stats) {
+            (globalThis as any).__ray_compiler_stats = {
+              backend: 'esbuild',
+              astNodes: 0,
+              parseTimeMs: 0,
+              transformTimeMs: 0,
+              emitTimeMs: 0
+            };
+          }
+          (globalThis as any).__ray_compiler_stats.backend = 'esbuild';
+        }
       }
 
       // 2. Parse and rewrite imports/exports
