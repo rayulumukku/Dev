@@ -1,0 +1,111 @@
+# ==========================================
+# GITHUB ACTIONS WORKFLOW CONFIGURATION
+# ==========================================
+name: Ray Cloud Distributed Build CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x, 24.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Authenticate with Ray Cloud
+      run: npx ray login --token ${{ secrets.RAY_CLOUD_TOKEN }} --org my-org --project my-project
+      env:
+        RAY_CLOUD_TOKEN: ${{ secrets.RAY_CLOUD_TOKEN }}
+
+    - name: Run Remote Distributed Build
+      run: npx ray build --remote
+
+    - name: Verify Ray Cloud cache health
+      run: npx ray cloud doctor
+
+
+# ==========================================
+# GITLAB CI CONFIGURATION (REFERENCE)
+# ==========================================
+#
+# stages:
+#   - build
+#
+# ray-cloud-build:
+#   stage: build
+#   image: node:22
+#   script:
+#     - npm ci
+#     - npx ray login --token $RAY_CLOUD_TOKEN --org my-org --project my-project
+#     - npx ray build --remote
+#     - npx ray cloud doctor
+#   only:
+#     - main
+#   variables:
+#     RAY_CLOUD_TOKEN: $RAY_CLOUD_TOKEN
+
+
+# ==========================================
+# AZURE PIPELINES CONFIGURATION (REFERENCE)
+# ==========================================
+#
+# pool:
+#   vmImage: 'ubuntu-latest'
+#
+# steps:
+# - task: NodeTool@0
+#   inputs:
+#     versionSpec: '22.x'
+#   displayName: 'Install Node.js'
+#
+# - script: |
+#     npm ci
+#     npx ray login --token $(RAY_CLOUD_TOKEN) --org my-org --project my-project
+#     npx ray build --remote
+#     npx ray cloud doctor
+#   displayName: 'Ray Cloud distributed compile'
+#   env:
+#     RAY_CLOUD_TOKEN: $(RAY_CLOUD_TOKEN)
+
+
+# ==========================================
+# CIRCLECI CONFIGURATION (REFERENCE)
+# ==========================================
+#
+# version: 2.1
+# jobs:
+#   build:
+#     docker:
+#       - image: cimg/node:22.0
+#     steps:
+#       - checkout
+#       - run:
+#           name: Install dependencies
+#           command: npm ci
+#       - run:
+#           name: Ray Cloud compile
+#           command: |
+#             npx ray login --token $RAY_CLOUD_TOKEN --org my-org --project my-project
+#             npx ray build --remote
+#             npx ray cloud doctor
+# workflows:
+#   build_and_test:
+#     jobs:
+#       - build

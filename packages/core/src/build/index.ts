@@ -20,6 +20,7 @@ interface BuildOptions {
   external?: string;
   dts?: boolean;
   mode?: string;
+  remote?: boolean;
 }
 
 /**
@@ -35,6 +36,28 @@ export async function buildProject(options: BuildOptions) {
   // Initialize RayCore orchestrator
   const core = new RayCore(projectRoot, options.mode || 'production');
   await core.init();
+
+  if (options.remote) {
+    const { DistributedBuildExecutor } = await import('./remoteExecutor.js');
+    const executor = new DistributedBuildExecutor(core, 4);
+    const scanFiles: string[] = [];
+    const srcDir = path.join(projectRoot, 'src');
+    const globScan = (dir: string) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        if (fs.statSync(fullPath).isDirectory()) {
+          globScan(fullPath);
+        } else if (['.js', '.jsx', '.ts', '.tsx'].some(ext => file.endsWith(ext))) {
+          scanFiles.push(fullPath);
+        }
+      }
+    };
+    globScan(srcDir);
+    const summary = await executor.runRemoteBuild(scanFiles);
+    return summary;
+  }
 
   const configBuild = core.config.build || {};
   const isLib = !!options.lib || !!configBuild.lib;
