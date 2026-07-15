@@ -39,8 +39,14 @@ describe('Optimizer Unit Tests', () => {
     );
   });
 
-  afterAll(() => {
-    fs.rmSync(projectRoot, { recursive: true, force: true });
+  afterAll(async () => {
+    // Retry once on Windows EPERM (file handle still open after test completes)
+    const cleanup = () => {
+      try { fs.rmSync(projectRoot, { recursive: true, force: true }); } catch { /* ignore */ }
+    };
+    cleanup();
+    await new Promise<void>((r) => setTimeout(r, 200));
+    cleanup();
   });
 
   it('should scan dependencies from entry files', async () => {

@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'fs';
 import { pathToFileURL } from 'url';
-import { RayCompiler } from '../compiler/index.js';
 
 /**
  * loadConfig
@@ -11,40 +10,44 @@ import { RayCompiler } from '../compiler/index.js';
  *
  * Strategy:
  *  1. Read source with fs
- *  2. Compile TypeScript/JSX to ESM via RayCompiler.compile()
- *  3. Write compiled output to a timestamped .js temp file under .ray/
- *  4. dynamic import() the temp file
- *  5. Clean up the temp file
+ *  2a. If it is a .js file: write directly as .mjs temp file (already valid ESM)
+ *  2b. If it is a .ts file: apply lightweight TypeScript stripping (remove type
+ *      annotations, interface blocks) and write as .mjs temp file
+ *  3. dynamic import() the temp file
+ *  4. Clean up the temp file
+ *
+ * This avoids feeding config files through Ray's full AST→codegen pipeline which
+ * can produce malformed output for complex object literals.
  */
 export async function loadConfig(projectRoot: string) {
   const tsConfigPath = path.join(projectRoot, 'ray.config.ts');
   const jsConfigPath = path.join(projectRoot, 'ray.config.js');
 
   let configPath = '';
+  let isTypeScript = false;
+
   if (fs.existsSync(tsConfigPath)) {
     configPath = tsConfigPath;
+    isTypeScript = true;
   } else if (fs.existsSync(jsConfigPath)) {
     configPath = jsConfigPath;
+    isTypeScript = false;
   } else {
     return { plugins: [] };
   }
 
-  const src = fs.readFileSync(configPath, 'utf-8');
+  let src = fs.readFileSync(configPath, 'utf-8');
 
-  // Compile with RayCompiler
-  let compiled = src;
-  try {
-    const compiler = new RayCompiler({});
-    const result = compiler.compile(src, configPath);
-    compiled = result.code;
-  } catch {
-    // If Ray compiler fails on config syntax, use raw source (already JS)
-    compiled = src;
+  // For TypeScript config files: strip type annotations using lightweight regex
+  // transforms — intentionally NOT routing through Ray's full AST pipeline to
+  // avoid codegen issues with complex object literal constructs.
+  if (isTypeScript) {
+    src = stripTypeScript(src);
   }
 
   const tempOut = path.join(projectRoot, '.ray', `config.timestamp.${Date.now()}.mjs`);
   fs.mkdirSync(path.dirname(tempOut), { recursive: true });
-  fs.writeFileSync(tempOut, compiled, 'utf-8');
+  fs.writeFileSync(tempOut, src, 'utf-8');
 
   try {
     const configUrl = pathToFileURL(tempOut).toString() + `?t=${Date.now()}`;
@@ -57,4 +60,37 @@ export async function loadConfig(projectRoot: string) {
       // Silently ignore cleanup failure
     }
   }
+}
+
+/**
+ * Lightweight TypeScript syntax stripper.
+ *
+ * Handles the common patterns found in ray.config.ts files:
+ * - `import type { ... }` statements
+ * - `interface Foo { ... }` blocks
+ * - `: Type` annotations on function params and variable declarations
+ * - `as Type` casts
+ * - Generic type parameters `<T>` on non-JSX calls
+ */
+function stripTypeScript(src: string): string {
+  // Remove `import type` statements
+  src = src.replace(/^import\s+type\s+[^\n]+\n/gm, '');
+
+  // Remove `interface ... { ... }` blocks (multi-line)
+  src = src.replace(/\binterface\s+\w[\w\d]*\s*(\<[^>]+\>)?\s*\{[^}]*\}/gs, '');
+
+  // Remove `type Alias = ...;` declarations
+  src = src.replace(/^type\s+\w[\w\d]*\s*=\s*[^;]+;/gm, '');
+
+  // Remove `: TypeAnnotation` from function params and variable declarations
+  // Match `: SomeType` that is followed by = , ) ; { whitespace
+  src = src.replace(/:\s*[A-Z][A-Za-z0-9<>,\s\[\]|&\?\.]*(?=[=,\)\s;{])/g, '');
+
+  // Remove `as Type` casts (but not `async`)
+  src = src.replace(/\bas\s+[A-Z]\w*/g, '');
+
+  // Remove leading/trailing whitespace artifacts
+  src = src.replace(/\n{3,}/g, '\n\n');
+
+  return src;
 }

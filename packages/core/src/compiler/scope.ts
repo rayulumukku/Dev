@@ -86,6 +86,25 @@ export class ScopeAnalyzer {
       // Property of MemberExpression (e.g. obj.prop) is not usually a lookup variable
     } else if (node.type === NodeType.Identifier) {
       currentScope.reference(node.name);
+    } else if (node.type === 'ExportDefaultDeclaration') {
+      // export default <expression|identifier|function>
+      // The exported value is a reference that must be counted
+      if (node.declaration) {
+        this.visit(node.declaration, currentScope);
+      }
+    } else if (node.type === 'ExportNamedDeclaration') {
+      // export { a, b } or export const x = ...
+      if (node.declaration) {
+        this.visit(node.declaration, currentScope);
+      }
+      // export { foo, bar } — each exported specifier references the local binding
+      if (node.specifiers) {
+        node.specifiers.forEach((spec: any) => {
+          if (spec.local) currentScope.reference(spec.local.name);
+        });
+      }
+    } else if (node.type === 'ExportAllDeclaration') {
+      // export * from '...' — no local binding references
     }
   }
 }

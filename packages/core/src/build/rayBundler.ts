@@ -51,10 +51,13 @@ export class RayBundler {
   private resolver: Resolver;
   private visitedModules: Map<string, string> = new Map(); // file → compiled code
   private moduleOrder: string[] = [];
+  /** define() map made available to traverse() for pre-compile substitution */
+  private defineMap: Record<string, string> = {};
 
   constructor(projectRoot: string, define: Record<string, string> = {}) {
     this.compiler = new RayCompiler(define);
     this.resolver = new Resolver(projectRoot);
+    this.defineMap = define;
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -106,6 +109,12 @@ export class RayBundler {
       src = fs.readFileSync(file, 'utf-8');
     } catch {
       return;
+    }
+
+    // Apply define() substitutions on the SOURCE before compilation so that
+    // the compiler / optimizer sees literal values (avoids premature pruning)
+    if (this.defineMap) {
+      src = this.applyDefine(src, this.defineMap);
     }
 
     // Detect and convert CJS
@@ -170,6 +179,8 @@ export class RayBundler {
     // Reset state per bundle (zero global state)
     this.visitedModules = new Map();
     this.moduleOrder = [];
+    // Merge constructor-level defines with per-bundle defines; apply pre-compile (in traverse)
+    this.defineMap = { 'process.env.NODE_ENV': '"production"', ...options.define };
 
     await this.traverse(options.entryPoint, external);
 
@@ -179,7 +190,6 @@ export class RayBundler {
 
     for (const file of this.moduleOrder) {
       let code = this.visitedModules.get(file) ?? '';
-      code = this.applyDefine(code, { 'process.env.NODE_ENV': '"production"', ...define });
 
       if (file.endsWith('.css')) {
         cssAccumulator += `\n/* ${path.basename(file)} */\n${code}`;

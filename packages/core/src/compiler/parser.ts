@@ -13,6 +13,10 @@ export class Parser {
     return this.tokens[this.current] || { type: TokenType.EOF, value: '', line: 0, column: 0 };
   }
 
+  private peek2(): Token | null {
+    return this.tokens[this.current + 1] || null;
+  }
+
   private advance(): Token {
     const t = this.peek();
     if (this.current < this.tokens.length) {
@@ -111,7 +115,16 @@ export class Parser {
         return this.parseVariableDeclaration();
       }
       if (token.value === 'function') {
-        return this.parseFunctionDeclaration();
+        return this.parseFunctionDeclaration(false);
+      }
+      if (token.value === 'async') {
+        // async function declaration: async function foo() {}
+        const next = this.peek2();
+        if (next && next.value === 'function') {
+          this.advance(); // consume 'async'
+          return this.parseFunctionDeclaration(true);
+        }
+        // async arrow: async () => {} — fall through to expression
       }
       if (token.value === 'if') {
         return this.parseIfStatement();
@@ -203,11 +216,26 @@ export class Parser {
   private parseExportDeclaration(): ASTNode {
     this.consume(TokenType.Keyword, 'export');
     const next = this.peek();
-    
+
     let isDefault = false;
     if (next.value === 'default') {
       this.advance();
       isDefault = true;
+    }
+
+    // Handle: export async function foo() {}
+    const curr = this.peek();
+    if (curr.value === 'async') {
+      const afterAsync = this.peek2();
+      if (afterAsync && afterAsync.value === 'function') {
+        this.advance(); // consume 'async'
+        const decl = this.parseFunctionDeclaration(true);
+        return {
+          type: NodeType.ExportNamedDeclaration,
+          declaration: decl,
+          isDefault,
+        };
+      }
     }
 
     const decl = this.parseStatement();
@@ -261,15 +289,15 @@ export class Parser {
     };
   }
 
-  private parseFunctionDeclaration(): ASTNode {
+  private parseFunctionDeclaration(isAsync = false): ASTNode {
     this.consume(TokenType.Keyword, 'function');
     const id = this.consume(TokenType.Identifier);
-    
+
     this.consume(TokenType.Punctuator, '(');
     const params: ASTNode[] = [];
     while (this.peek().value !== ')') {
       const paramName = this.consume(TokenType.Identifier).value;
-      
+
       // TS Param annotations stripping
       if (this.peek().value === ':') {
         this.advance(); // :
@@ -287,6 +315,7 @@ export class Parser {
 
     return {
       type: NodeType.FunctionDeclaration,
+      async: isAsync,
       id: { type: NodeType.Identifier, name: id.value },
       params,
       body
@@ -316,7 +345,15 @@ export class Parser {
 
   private parseReturnStatement(): ASTNode {
     this.consume(TokenType.Keyword, 'return');
-    const argument = this.peek().value !== ';' ? this.parseExpression() : null;
+    let argument: ASTNode | null = null;
+    if (this.peek().value !== ';' && this.peek().value !== '}' && this.peek().type !== TokenType.EOF) {
+      // If next token is '{', parse as an object expression (not a block)
+      if (this.peek().value === '{') {
+        argument = this.parseObjectExpression();
+      } else {
+        argument = this.parseExpression();
+      }
+    }
     if (this.peek().value === ';') {
       this.advance();
     }
@@ -329,13 +366,43 @@ export class Parser {
   private parseBlockStatement(): ASTNode {
     this.consume(TokenType.Punctuator, '{');
     const body: ASTNode[] = [];
-    while (this.peek().value !== '}') {
+    while (this.peek().value !== '}' && this.peek().type !== TokenType.EOF) {
       body.push(this.parseStatement());
     }
     this.consume(TokenType.Punctuator, '}');
     return {
       type: NodeType.BlockStatement,
       body
+    };
+  }
+
+  private parseObjectExpression(): ASTNode {
+    this.consume(TokenType.Punctuator, '{');
+    const properties: Array<{ key: ASTNode; value: ASTNode }> = [];
+
+    while (this.peek().value !== '}' && this.peek().type !== TokenType.EOF) {
+      // key
+      const keyToken = this.advance();
+      const key: ASTNode = {
+        type: NodeType.Identifier,
+        name: keyToken.type === TokenType.StringLiteral
+          ? keyToken.value.replace(/['"`]/g, '')
+          : keyToken.value
+      };
+
+      this.consume(TokenType.Punctuator, ':');
+      const value = this.parseExpression();
+      properties.push({ key, value });
+
+      if (this.peek().value === ',') {
+        this.advance();
+      }
+    }
+
+    this.consume(TokenType.Punctuator, '}');
+    return {
+      type: 'ObjectExpression' as any,
+      properties
     };
   }
 

@@ -166,8 +166,26 @@ export class CodeGenerator {
       }
 
       case NodeType.ExportNamedDeclaration: {
-        const prefix = node.isDefault ? `export${space}default${space}` : `export${space}`;
-        return this.emit(`${prefix}${this.generate(node.declaration)}`);
+        // export const x = ... / export function f() {}
+        if (node.declaration) {
+          const prefix = node.isDefault ? `export${space}default${space}` : `export${space}`;
+          return this.emit(`${prefix}${this.generate(node.declaration)}`);
+        }
+        // export { a, b } or export { a } from 'module'
+        if (node.specifiers && node.specifiers.length > 0) {
+          const specs = (node.specifiers as any[]).map((s: any) => {
+            const local = this.generate(s.local);
+            const exported = s.exported ? this.generate(s.exported) : local;
+            return local === exported ? local : `${local}${space}as${space}${exported}`;
+          }).join(`,${space}`);
+          const src = node.source ? `${space}from${space}${this.generate(node.source)}` : '';
+          return this.emit(`export${space}{${space}${specs}${space}}${src};`);
+        }
+        // export default <expr>
+        if (node.isDefault) {
+          return this.emit(`export${space}default${space}${this.generate(node.expression ?? node.declaration)};`);
+        }
+        return this.emit('');
       }
 
       case NodeType.VariableDeclaration: {
@@ -182,10 +200,11 @@ export class CodeGenerator {
       }
 
       case NodeType.FunctionDeclaration: {
+        const asyncPrefix = node.async ? `async${space}` : '';
         const id = this.generate(node.id);
         const params = node.params.map((p: any) => this.generate(p)).join(`,${space}`);
         const body = this.generate(node.body);
-        return this.emit(`function${space}${id}(${params})${space}${body}`);
+        return this.emit(`${asyncPrefix}function${space}${id}(${params})${space}${body}`);
       }
 
       case NodeType.BlockStatement: {
@@ -239,7 +258,15 @@ export class CodeGenerator {
         return this.emit(node.raw !== undefined ? node.raw : JSON.stringify(node.value));
 
       case 'ObjectExpression': {
-        const props = node.properties.map((p: any) => this.generate(p)).join(`,${space}`);
+        const props = (node.properties as any[]).map((p: any) => {
+          // Parser stores as { key: ASTNode, value: ASTNode }
+          // External ASTs may use { type: 'Property', key, value }
+          const keyNode = p.key ?? p.name;
+          const valNode = p.value;
+          const key = this.generate(keyNode);
+          const val = this.generate(valNode);
+          return `${key}:${space}${val}`;
+        }).join(`,${space}`);
         return this.emit(`{${space}${props}${space}}`);
       }
 

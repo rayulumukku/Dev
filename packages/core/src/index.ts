@@ -358,51 +358,68 @@ export class RayCore {
    * Dynamically compiles and loads a target module inside the server Node environment.
    */
   async ssrLoadModule(filePath: string): Promise<any> {
-    const tempOut = path.join(this.projectRoot, '.ray', `ssr.${Date.now()}.js`);
+    const tempOut = path.join(this.projectRoot, '.ray', `ssr.${Date.now()}.mjs`);
     fs.mkdirSync(path.dirname(tempOut), { recursive: true });
 
-    const ssrVirtualPlugin = {
-      name: 'ssr-virtual-modules',
-      setup(build: any) {
-        build.onResolve({ filter: /^virtual:/ }, (args: any) => ({
-          path: args.path,
-          namespace: 'virtual',
-        }));
-        build.onLoad({ filter: /.*/, namespace: 'virtual' }, (args: any) => {
-          if (args.path === 'virtual:foo') {
-            return {
-              contents: 'export const message = "Hello from Virtual Module foo!";',
-              loader: 'js',
-            };
-          }
-          return null;
-        });
-      }
-    };
+    // Read and process the source for Node.js compatibility:
+    //  1. Rewrite relative imports to absolute file:// URLs (Node won't resolve
+    //     bare .jsx/.ts extensions from temp directories)
+    //  2. Rewrite bare package imports to node_modules paths
+    //  3. Keep the source otherwise intact — avoids the async-function codegen
+    //     bug in the current Ray Compiler pipeline
+    let src = fs.readFileSync(filePath, 'utf-8');
+    const fileDir = path.dirname(filePath);
 
-    // Bundle via RayBundler for SSR — outputs an ES module compatible with Node
-    const { RayBundler } = await import('./build/rayBundler.js');
-    const ssrBundler = new RayBundler(this.projectRoot);
-    const bundleOut = await ssrBundler.bundle({
-      entryPoint: filePath,
-      outFile: tempOut,
-      format: 'esm',
-      external: ['react', 'react-dom', 'react-dom/server', 'react-router-dom', 'react-router-dom/server', 'react-router'],
-    });
-    void bundleOut;
+    // Rewrite relative imports to absolute paths
+    src = src.replace(
+      /from\s+['"](\.[^'"]+)['"]/g,
+      (_match: string, spec: string) => {
+        const resolved = this.resolveImportPath(spec, fileDir);
+        return `from ${JSON.stringify(resolved)}`;
+      }
+    );
+
+    // Rewrite bare package imports (e.g. 'react') to node_modules absolute paths
+    src = src.replace(
+      /from\s+['"]([^'"./][^'"]*)['"]/g,
+      (_match: string, spec: string) => {
+        try {
+          const resolved = this.resolver.resolveBarePackage(spec, fileDir);
+          return `from ${JSON.stringify(resolved)}`;
+        } catch {
+          return _match; // leave as-is if cannot resolve
+        }
+      }
+    );
+
+    fs.writeFileSync(tempOut, src, 'utf-8');
 
     try {
       const fileUrl = pathToFileURL(tempOut).toString() + `?t=${Date.now()}`;
-      const mod = await import(fileUrl);
+      const mod = await import(/* @vite-ignore */ fileUrl);
       return mod;
     } finally {
       try {
-        if (fs.existsSync(tempOut)) {
-          fs.unlinkSync(tempOut);
-        }
+        if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut);
       } catch {
-        // Ignore
+        // Ignore cleanup errors
       }
     }
+  }
+
+  private resolveImportPath(spec: string, fromDir: string): string {
+    const candidates = [
+      path.resolve(fromDir, spec),
+      path.resolve(fromDir, spec + '.js'),
+      path.resolve(fromDir, spec + '.jsx'),
+      path.resolve(fromDir, spec + '.ts'),
+      path.resolve(fromDir, spec + '.tsx'),
+      path.resolve(fromDir, spec, 'index.js'),
+      path.resolve(fromDir, spec, 'index.jsx'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return pathToFileURL(c).toString();
+    }
+    return pathToFileURL(path.resolve(fromDir, spec)).toString();
   }
 }
