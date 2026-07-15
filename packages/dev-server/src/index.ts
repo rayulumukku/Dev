@@ -223,6 +223,18 @@ export async function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Serve compiler cache telemetry status
+    if (pathname === '/__ray/cache') {
+      if (ray) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(ray.cacheStore.getDiagnostics(), null, 2));
+      } else {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Cache metrics unavailable in preview mode');
+      }
+      return;
+    }
+
     // Diagnostics: Expose full runtime diagnostics snapshot
     if (pathname === '/__ray/studio/diagnostics') {
       const memory = process.memoryUsage();

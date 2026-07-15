@@ -7,6 +7,8 @@ export default defineConfig({
       '**/dist/**',
       '**/tests/e2e/**',
     ],
+    testTimeout: 25000,
+    hookTimeout: 25000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

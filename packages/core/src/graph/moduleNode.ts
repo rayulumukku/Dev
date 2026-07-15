@@ -17,6 +17,15 @@ export class ModuleNode {
   /** Tracks whether the module accepts its own updates (HMR boundary) */
   isSelfAccepting = false;
 
+  /** Incremental compilation state tracking */
+  status: 'clean' | 'dirty' | 'rebuilding' | 'failed' = 'dirty';
+  /** Hash of file content when last compiled */
+  hash = '';
+  /** Cached abstract syntax tree (AST) object */
+  ast: any = null;
+  /** Cached transformed code and source map wrapper output */
+  cachedOutput: { code: string; map?: any } | null = null;
+
   constructor(id: string, file: string, url: string) {
     this.id = id;
     this.file = file;

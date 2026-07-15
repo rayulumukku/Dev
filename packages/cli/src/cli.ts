@@ -374,9 +374,62 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'cache') {
+  const sub = args[1] || 'info';
+  (async () => {
+    try {
+      const { CompilerCacheStore, RayCore } = await import('@ray/core');
+      const store = new CompilerCacheStore(process.cwd());
+
+      if (sub === 'info') {
+        const diag = store.getDiagnostics();
+        console.log(`\n📦 Ray Persistent Cache Info:\n`);
+        console.log(`  > Cache Entries:       ${diag.entries}`);
+        console.log(`  > Size on Disk:        ${diag.sizeMB} MB`);
+        console.log(`  > Accumulator HitRate: ${diag.hitRate}%`);
+        console.log(`  > Reused Transforms:   ${diag.reusedTransforms}`);
+        console.log(`  > Invalidations Count: ${diag.invalidations}`);
+      } else if (sub === 'clean') {
+        store.clear();
+        console.log('✨ Ray Compiler Cache directory cleared successfully.');
+      } else if (sub === 'verify') {
+        const isOk = store.verify();
+        console.log(`[${isOk ? '✔' : '❌'}] Compiler cache verification: ${isOk ? 'VALID' : 'CORRUPTED/INVALID'}`);
+        process.exit(isOk ? 0 : 1);
+      } else if (sub === 'warm') {
+        console.log('🔥 Warming up compiler cache for src/ directory...');
+        const ray = new RayCore(process.cwd());
+        await ray.init();
+        const fs = await import('fs');
+        const globScan = async (dir: string) => {
+          if (!fs.existsSync(dir)) return;
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            const fullPath = path.join(dir, file);
+            if (fs.statSync(fullPath).isDirectory()) {
+              await globScan(fullPath);
+            } else if (['.js', '.jsx', '.ts', '.tsx'].some(ext => file.endsWith(ext))) {
+              const code = fs.readFileSync(fullPath, 'utf-8');
+              await ray.transform(code, fullPath);
+            }
+          }
+        };
+        const srcDir = path.join(process.cwd(), 'src');
+        await globScan(srcDir);
+        console.log('🎉 Cache warming completed successfully.');
+      } else {
+        console.error(`Unknown cache command: "ray cache ${sub}". Available: info, clean, verify, warm`);
+        process.exit(1);
+      }
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Cache command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else {
   console.log(`
- ⚡ Ray CLI (Milestone 15 - Ray Studio Visual Inspector) ⚡
+ ⚡ Ray CLI (Milestone 16 - Incremental Compiler & Persistent Cache) ⚡
 
 Usage:
   ray dev             Start the live dev server
@@ -390,6 +443,10 @@ Usage:
   ray create <name>   Scaffold a new project (templates: react, react-ts, react-ssr, library)
   ray verify          Perform full project diagnostic checks
   ray release         Publish automation pipeline (bumping version, changelog, tagging)
+  ray cache info      Display compiler cache usage details
+  ray cache clean     Delete persistent compiler cache directory
+  ray cache verify    Verify syntax and schema validation of compiler cache
+  ray cache warm      Pre-compile and warm compiler caches for project
 
 Options for build:
   --outDir <path>     Specify production output directory (default: dist)

@@ -18,6 +18,12 @@ export interface PluginContext {
   emitFile(name: string, content: string | Buffer): void;
   addWatchFile(file: string): void;
   resolveId(id: string, importer?: string): Promise<string | null>;
+  cacheStore?: any;
+  cache?: {
+    get(key: string): any;
+    set(key: string, val: any): void;
+    invalidate(key: string): void;
+  };
 }
 
 export interface RayPlugin {
