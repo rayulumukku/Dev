@@ -1,4 +1,4 @@
-import chokidar from 'chokidar';
+import { RayFSWatcher } from '@ray/fs';
 import path from 'path';
 
 interface WatcherOptions {
@@ -7,14 +7,13 @@ interface WatcherOptions {
 }
 
 /**
- * Initializes chokidar to watch code changes inside src/, public/, and index.html.
+ * Initializes RayFSWatcher to watch code changes inside src/, public/, and index.html.
  * Debounces rapid successive triggers and filters out build/ignored directories.
  */
-export function startFileWatcher(options: WatcherOptions): chokidar.FSWatcher {
+export function startFileWatcher(options: WatcherOptions): RayFSWatcher {
   const { projectRoot, onChange } = options;
 
-  // We explicitly watch the relevant project folders and index.html
-  const watcher = chokidar.watch([
+  const watcher = new RayFSWatcher([
     path.join(projectRoot, 'src'),
     path.join(projectRoot, 'public'),
     path.join(projectRoot, 'index.html'),
@@ -29,30 +28,10 @@ export function startFileWatcher(options: WatcherOptions): chokidar.FSWatcher {
       /~$/,
     ],
     persistent: true,
-    ignoreInitial: true, // Skip scanning existing files on startup
   });
 
-  let debounceTimer: NodeJS.Timeout | null = null;
-  const changedFiles = new Set<string>();
-
-  watcher.on('all', (event, filePath) => {
-    if (event === 'change' || event === 'add' || event === 'unlink') {
-      const absPath = path.resolve(filePath);
-      changedFiles.add(absPath);
-
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-
-      // Debounce window (40ms) to aggregate quick successive file writes
-      debounceTimer = setTimeout(() => {
-        for (const file of changedFiles) {
-          onChange(file);
-        }
-        changedFiles.clear();
-        debounceTimer = null;
-      }, 40);
-    }
+  watcher.on('all', (event: any, filePath: string) => {
+    onChange(filePath);
   });
 
   return watcher;

@@ -185,6 +185,25 @@ export async function startDevServer(options: DevServerOptions) {
       return;
     }
 
+    // Diagnostics: Expose File Watcher diagnostics
+    if (pathname === '/__ray/fs' || pathname === '/___ray/fs') {
+      if (watcher && typeof (watcher as any).getDiagnostics === 'function') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify((watcher as any).getDiagnostics(), null, 2));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          platform: process.platform,
+          watcherCount: 0,
+          cpuUsagePercent: 0,
+          memoryMB: 0,
+          totalEventsProcessed: 0,
+          avgLatencyMs: 0
+        }, null, 2));
+      }
+      return;
+    }
+
     // Diagnostics: Serve Ray Studio dashboard HTML
     if (pathname === '/__ray/studio') {
       const dir = path.dirname(fileURLToPath(import.meta.url));

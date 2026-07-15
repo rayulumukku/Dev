@@ -10,6 +10,7 @@
   "dependencies": {
     "@ray/core": "*",
     "@ray/hmr-runtime": "*",
+    "@ray/fs": "*",
     "chokidar": "^3.6.0",
     "ws": "^8.16.0"
   },
