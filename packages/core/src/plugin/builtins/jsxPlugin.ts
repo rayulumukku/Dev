@@ -41,23 +41,17 @@ export function jsxPlugin(): RayPlugin {
         const parser = new Parser(new Lexer(jsCode).tokenize());
         ast = parser.parse();
       } else {
-        // Fallback or Auto mode
-        let compiledResult = null;
-        if (configCompiler === 'auto') {
-          try {
-            const compiler = new (await import('../../compiler/index.js')).RayCompiler((globalThis as any).__ray_cache_store?.env || {});
-            const res = compiler.compile(rawCode, id);
-            compiledResult = res.code;
-            const parser = new Parser(new Lexer(compiledResult).tokenize());
-            ast = parser.parse();
-          } catch (err: any) {
-            console.warn(`[Ray Compiler] Compilation failed for ${id}, falling back to esbuild compatibility mode:`, err.message);
-          }
-        }
-
-        if (compiledResult !== null) {
-          jsCode = compiledResult;
-        } else {
+        // Auto mode or default: always use RayCompiler
+        try {
+          const compiler = new (await import('../../compiler/index.js')).RayCompiler(
+            (globalThis as any).__ray_cache_store?.env || {}
+          );
+          const res = compiler.compile(rawCode, id);
+          jsCode = res.code;
+          const parser = new Parser(new Lexer(jsCode).tokenize());
+          ast = parser.parse();
+        } catch (err: any) {
+          // Parse error → fall through with raw JS, transformJsx handles remaining cases
           jsCode = await transformJsx(rawCode, id);
           return { code: jsCode };
         }

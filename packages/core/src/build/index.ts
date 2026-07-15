@@ -1,4 +1,4 @@
-import { build, context } from 'esbuild';
+import { RayBundler } from './rayBundler.js';
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
@@ -120,76 +120,41 @@ export async function buildProject(options: BuildOptions) {
 
     const reports: any[] = [];
 
-    // Bundle each format
+    // Bundle each format via RayBundler (native — no esbuild)
+    const bundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+
     for (const format of libConfig.formats) {
       console.log(`  > Compiling format: ${format}`);
       const outFileName = getFileName(format);
       const outFilePath = path.join(baseOutDir, outFileName);
 
-      const isUmd = format === 'umd';
-      const targetFormat = isUmd ? 'iife' : format;
+      const banner = configBuild.banner as string | undefined;
+      const footer = configBuild.footer as string | undefined;
 
-      const banner = configBuild.banner ? { js: configBuild.banner } : undefined;
-      const footer = configBuild.footer ? { js: configBuild.footer } : undefined;
-
-      const esbuildConfig: any = {
-        entryPoints: [entryFilePath],
-        bundle: true,
-        format: targetFormat,
-        globalName: format === 'iife' || isUmd ? libConfig.name : undefined,
-        minify: options.minify,
-        sourcemap: sourcemapOption,
-        write: true,
-        outfile: outFilePath,
+      const output = await bundler.bundle({
+        entryPoint: entryFilePath,
+        outFile: outFilePath,
+        format: (format === 'umd' ? 'umd' : format) as any,
+        globalName: libConfig.name,
         external: externals,
+        minify: options.minify,
+        sourcemap: !!sourcemapOption,
         banner,
         footer,
-        loader: {
-          '.png': 'file',
-          '.jpg': 'file',
-          '.jpeg': 'file',
-          '.gif': 'file',
-          '.svg': 'file',
-          '.woff': 'file',
-          '.woff2': 'file',
-          '.ttf': 'file',
-          '.json': 'json',
-          '.css': 'css',
-        },
-        define: {
-          'process.env.NODE_ENV': '"production"',
-        },
-      };
+      });
 
-      await build(esbuildConfig);
-
-      if (isUmd && fs.existsSync(outFilePath)) {
-        let code = fs.readFileSync(outFilePath, 'utf-8');
-        code = `(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-  typeof define === 'function' && define.amd ? define(['exports'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.${libConfig.name} = {}));
-})(this, (function (exports) {
-  ${code}
-}));`;
-        fs.writeFileSync(outFilePath, code);
+      // Write extracted CSS if present
+      if (output.css) {
+        const cssFileName = configBuild.cssFileName || 'style.css';
+        fs.writeFileSync(path.join(baseOutDir, cssFileName), output.css);
+        console.log(`  > Emitted stylesheet: ${cssFileName}`);
       }
-
-      const fileSize = fs.existsSync(outFilePath) ? fs.statSync(outFilePath).size : 0;
 
       reports.push({
         format,
         fileName: outFileName,
-        sizeBytes: fileSize,
+        sizeBytes: output.sizeBytes,
       });
-
-      // Handle standalone stylesheet if esbuild outputs a css file
-      const defaultCssPath = outFilePath.replace(/\.js$/, '.css');
-      if (fs.existsSync(defaultCssPath)) {
-        const cssFileName = configBuild.cssFileName || 'style.css';
-        fs.renameSync(defaultCssPath, path.join(baseOutDir, cssFileName));
-        console.log(`  > Emitted stylesheet: ${cssFileName}`);
-      }
     }
 
     // 2. Generate Type Declarations (.d.ts)
@@ -256,34 +221,14 @@ export async function buildProject(options: BuildOptions) {
     console.log(`  > Server Dir:  ${serverOutDir}`);
   }
 
-  const rayEsbuildPlugin = {
-    name: 'ray-plugins-bridge',
-    setup(build: any) {
-      build.onResolve({ filter: /.*/ }, async (args: any) => {
-        if (args.kind === 'entry-point') return null;
-        const resolved = await core.container.resolveId(args.path, args.importer);
-        if (resolved !== null) {
-          return {
-            path: resolved,
-            namespace: resolved.startsWith('\0') ? 'virtual' : undefined,
-          };
-        }
-        return null;
-      });
-
-      build.onLoad({ filter: /.*/ }, async (args: any) => {
-        if (args.namespace === 'virtual' || args.path.startsWith('\0')) {
-          const loaded = await core.container.load(args.path);
-          if (loaded !== null) {
-            return {
-              contents: loaded,
-              loader: 'js',
-            };
-          }
-        }
-        return null;
-      });
-    }
+  // Ray Plugin bridge — used by the RayBundler pipeline
+  const pluginBridge = {
+    async resolveId(spec: string, importer: string) {
+      return core.container.resolveId(spec, importer);
+    },
+    async load(id: string) {
+      return core.container.load(id);
+    },
   };
 
   // 1. Locate and parse index.html for client entry script
@@ -313,53 +258,38 @@ export async function buildProject(options: BuildOptions) {
 
   console.log(`  > Client Entry: ${entryFilePath}`);
 
-  // 2. Client assets compilation configuration
-  const clientEsbuildConfig: any = {
-    entryPoints: {
-      main: entryFilePath,
-    },
-    bundle: true,
-    format: 'esm',
-    minify: options.minify,
-    sourcemap: sourcemapOption,
-    splitting: true,
-    write: true,
-    metafile: true,
-    plugins: [rayEsbuildPlugin],
-    outdir: path.join(clientOutDir, 'assets'),
-    entryNames: '[name].[hash]',
-    chunkNames: 'chunk.[hash]',
-    assetNames: '[name].[hash]',
-    loader: {
-      '.png': 'file',
-      '.jpg': 'file',
-      '.jpeg': 'file',
-      '.gif': 'file',
-      '.svg': 'file',
-      '.woff': 'file',
-      '.woff2': 'file',
-      '.ttf': 'file',
-      '.json': 'json',
-      '.css': 'css',
-    },
-    define: {
-      'process.env.NODE_ENV': '"production"',
-    },
-  };
+  // 2. Prepare client output dir
+  fs.mkdirSync(path.join(clientOutDir, 'assets'), { recursive: true });
 
   // 3. Handle Client Watch Build
   if (options.watch) {
-    const ctx = await context(clientEsbuildConfig);
-    await ctx.watch();
-    console.log(`\n[Ray Build] watch mode active. Watching files for changes...\n`);
+    console.log(`\n[Ray Build] watch mode not yet supported without esbuild context. Use dev-server for HMR.\n`);
     return;
   }
 
-  // 4. Compile Client Assets
-  const clientResult = await build(clientEsbuildConfig);
-  if (!clientResult.metafile) {
-    throw new Error('Client Build metafile generation failed.');
-  }
+  // 4. Compile Client Assets via RayBundler
+  const clientBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+  const clientBundleOut = await clientBundler.bundle({
+    entryPoint: entryFilePath,
+    outFile: path.join(clientOutDir, 'assets', 'main.js'),
+    format: 'esm',
+    minify: options.minify,
+    sourcemap: !!sourcemapOption,
+  });
+
+  // Synthetic metafile for downstream manifest generation
+  const clientResult = {
+    metafile: {
+      inputs: { [entryScript]: {} },
+      outputs: {
+        [path.join(clientOutDir, 'assets', 'main.js')]: {
+          entryPoint: entryFilePath,
+          bytes: clientBundleOut.sizeBytes,
+          imports: [],
+        },
+      },
+    },
+  };
 
   // 5. Build Client Manifest
   const manifest: Record<string, any> = {};
@@ -428,46 +358,15 @@ export async function buildProject(options: BuildOptions) {
       throw new Error(`Server entry script "src/entry-server.jsx" not found.`);
     }
 
-    const serverEsbuildConfig: any = {
-      entryPoints: {
-        server: serverEntryFilePath,
-      },
-      bundle: true,
-      platform: 'node',
+    const serverBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+    await serverBundler.bundle({
+      entryPoint: serverEntryFilePath,
+      outFile: path.join(serverOutDir, 'server.js'),
       format: 'esm',
+      external: ['react', 'react-dom', 'react-dom/server', 'react-router-dom', 'react-router-dom/server', 'react-router'],
       minify: options.minify,
-      sourcemap: sourcemapOption,
-      write: true,
-      metafile: true,
-      plugins: [rayEsbuildPlugin],
-      outdir: serverOutDir,
-      entryNames: '[name]',
-      loader: {
-        '.png': 'file',
-        '.jpg': 'file',
-        '.jpeg': 'file',
-        '.gif': 'file',
-        '.svg': 'file',
-        '.woff': 'file',
-        '.woff2': 'file',
-        '.ttf': 'file',
-        '.json': 'json',
-        '.css': 'copy',
-      },
-      external: [
-        'react',
-        'react-dom',
-        'react-dom/server',
-        'react-router-dom',
-        'react-router-dom/server',
-        'react-router'
-      ],
-      define: {
-        'process.env.NODE_ENV': '"production"',
-      },
-    };
-
-    await build(serverEsbuildConfig);
+      sourcemap: !!sourcemapOption,
+    });
   }
 
   // 8. Execute SSG Pre-rendering (if SSG mode active)
@@ -510,9 +409,9 @@ export async function buildProject(options: BuildOptions) {
     moduleCount = Object.keys(clientResult.metafile.inputs).length;
   }
 
-  for (const [outputKey, outputMeta] of Object.entries(clientOutputs)) {
+  for (const [outputKey, outputMeta] of Object.entries(clientOutputs as Record<string, {bytes?: number; entryPoint?: string; imports?: any[]}>)) {
     chunkCount++;
-    const size = outputMeta.bytes;
+    const size = outputMeta.bytes ?? 0;
     const destFile = path.relative(clientOutDir, outputKey).replace(/\\/g, '/');
     assetSizes[destFile] = size;
 
