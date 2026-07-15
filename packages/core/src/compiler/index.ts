@@ -84,3 +84,4 @@ export * from './ast.js';
 export * from './lexer.js';
 export { ASTVisitor } from './visitor.js';
 export { Scope, ScopeAnalyzer } from './scope.js';
+export { transformCjsToEsm } from './cjsTransform.js';

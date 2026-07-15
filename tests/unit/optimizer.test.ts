@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import fs from 'fs';
-import { scanDeps, runOptimizer } from '../../packages/core/src/optimizer/index.js';
+import { scanDeps, runOptimizer, OptimizerGraph } from '../../packages/core/src/optimizer/index.js';
 import { Resolver } from '../../packages/core/src/resolver/index.js';
+import { transformCjsToEsm } from '../../packages/core/src/compiler/index.js';
 
 describe('Optimizer Unit Tests', () => {
   const projectRoot = path.resolve(process.cwd(), 'tests/fixtures/opt-project');
@@ -82,5 +83,23 @@ describe('Optimizer Unit Tests', () => {
     expect(res.optimized).toEqual({});
     const cacheDir = path.join(projectRoot, '.ray/cache');
     expect(fs.existsSync(cacheDir)).toBe(false);
+  });
+
+  it('should correctly convert CommonJS requires and module.exports to ESM formats', () => {
+    const cjs = 'const react = require("react"); module.exports = react;';
+    const esm = transformCjsToEsm(cjs);
+    expect(esm).toContain('import react from "react"');
+    expect(esm).toContain('export default react');
+  });
+
+  it('should manage OptimizerGraph status and track nodes correctly', () => {
+    const graph = new OptimizerGraph();
+    expect(graph.getStatus('react')).toBe('dirty');
+    
+    graph.register('react', 'hash-123', []);
+    expect(graph.getStatus('react')).toBe('clean');
+
+    graph.markDirty('react');
+    expect(graph.getStatus('react')).toBe('dirty');
   });
 });

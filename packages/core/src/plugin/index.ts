@@ -18,6 +18,7 @@ export interface PluginContext {
   emitFile(name: string, content: string | Buffer): void;
   addWatchFile(file: string): void;
   resolveId(id: string, importer?: string): Promise<string | null>;
+  load?(id: string): Promise<string | null>;
   cacheStore?: any;
   cache?: {
     get(key: string): any;

@@ -55,17 +55,18 @@ export class PluginContainer {
   private getPluginContext(plugin: RayPlugin): PluginContext {
     return {
       ...this.context,
-      resolveId: async (source, importer) => {
+      resolveId: async (source: string, importer?: string) => {
         return this.resolveId(source, importer || undefined);
       },
-      load: async (id) => {
+      load: async (id: string) => {
         return this.load(id);
       },
       logger: {
-        info: (msg) => console.log(`[Plugin: ${plugin.name}] ${msg}`),
-        warn: (msg) => console.warn(`[Plugin: ${plugin.name}] ${msg}`),
-        error: (msg) => console.error(`[Plugin: ${plugin.name}] ${msg}`),
-      },
+        ...console,
+        info: (msg: any) => console.log(`[Plugin: ${plugin.name}] ${msg}`),
+        warn: (msg: any) => console.warn(`[Plugin: ${plugin.name}] ${msg}`),
+        error: (msg: any) => console.error(`[Plugin: ${plugin.name}] ${msg}`),
+      } as any as Console,
     };
   }
 
@@ -84,12 +85,13 @@ export class PluginContainer {
     }
   }
 
-  async resolveId(source: string, importer?: string): Promise<string | null> {
+  async resolveId(source: string, importer?: string | null): Promise<string | null> {
     for (const plugin of this.plugins) {
       if (plugin.resolveId) {
-        const resolved = await this.runHook(plugin, 'resolveId', () =>
-          plugin.resolveId!.call(this.getPluginContext(plugin), source, importer || null)
-        );
+        const resolved = await this.runHook(plugin, 'resolveId', async () => {
+          const res = plugin.resolveId!.call(this.getPluginContext(plugin), source, importer || undefined);
+          return Promise.resolve(res);
+        });
         if (resolved !== null) {
           return resolved;
         }
@@ -101,9 +103,10 @@ export class PluginContainer {
   async load(id: string): Promise<string | null> {
     for (const plugin of this.plugins) {
       if (plugin.load) {
-        const loaded = await this.runHook(plugin, 'load', () =>
-          plugin.load!.call(this.getPluginContext(plugin), id)
-        );
+        const loaded = await this.runHook(plugin, 'load', async () => {
+          const res = plugin.load!.call(this.getPluginContext(plugin), id);
+          return Promise.resolve(res);
+        });
         if (loaded !== null) {
           return loaded;
         }
@@ -137,22 +140,24 @@ export class PluginContainer {
       if (plugin.transform) {
         // Wrap input in proxy to support both AST and string backward compatibility
         const input = currentAst ? createASTStringProxy(currentAst, currentCode) : currentCode;
-        const result = await this.runHook(plugin, 'transform', () =>
-          plugin.transform!.call(this.getPluginContext(plugin), input, id)
-        );
+        const result = await this.runHook(plugin, 'transform', async () => {
+          const res = plugin.transform!.call(this.getPluginContext(plugin), input, id);
+          return Promise.resolve(res);
+        });
 
         if (result !== null && result !== undefined) {
-          let resolvedResult = result;
-          if (result && result.__isProxy) {
-            resolvedResult = result.__rawString;
-          } else if (result && result.code && result.code.__isProxy) {
-            resolvedResult = { ...result, code: result.code.__rawString };
+          let resolvedResult: any = result;
+          const resObj = result as any;
+          if (resObj.__isProxy) {
+            resolvedResult = resObj.__rawString;
+          } else if (resObj.code && resObj.code.__isProxy) {
+            resolvedResult = { ...resObj, code: resObj.code.__rawString };
           }
 
           if (typeof resolvedResult === 'string') {
             currentCode = resolvedResult;
             currentAst = null;
-          } else if (resolvedResult && typeof resolvedResult === 'object' && resolvedResult.type) {
+          } else if (resolvedResult && typeof resolvedResult === 'object' && (resolvedResult as any).type) {
             currentAst = resolvedResult;
             currentCode = new CodeGenerator().generate(currentAst);
           } else {
@@ -189,9 +194,10 @@ export class PluginContainer {
   async handleHotUpdate(ctx: { file: string; timestamp: number }): Promise<void> {
     for (const plugin of this.plugins) {
       if (plugin.handleHotUpdate) {
-        await this.runHook(plugin, 'handleHotUpdate', () =>
-          plugin.handleHotUpdate!.call(this.getPluginContext(plugin), ctx)
-        );
+        await this.runHook(plugin, 'handleHotUpdate', async () => {
+          const res = plugin.handleHotUpdate!.call(this.getPluginContext(plugin), ctx);
+          return Promise.resolve(res);
+        });
       }
     }
   }
@@ -199,9 +205,10 @@ export class PluginContainer {
   async buildStart(): Promise<void> {
     for (const plugin of this.plugins) {
       if (plugin.buildStart) {
-        await this.runHook(plugin, 'buildStart', () =>
-          plugin.buildStart!.call(this.getPluginContext(plugin))
-        );
+        await this.runHook(plugin, 'buildStart', async () => {
+          const res = plugin.buildStart!.call(this.getPluginContext(plugin));
+          return Promise.resolve(res);
+        });
       }
     }
   }
@@ -209,9 +216,10 @@ export class PluginContainer {
   async buildEnd(): Promise<void> {
     for (const plugin of this.plugins) {
       if (plugin.buildEnd) {
-        await this.runHook(plugin, 'buildEnd', () =>
-          plugin.buildEnd!.call(this.getPluginContext(plugin))
-        );
+        await this.runHook(plugin, 'buildEnd', async () => {
+          const res = plugin.buildEnd!.call(this.getPluginContext(plugin));
+          return Promise.resolve(res);
+        });
       }
     }
   }
@@ -219,9 +227,10 @@ export class PluginContainer {
   async generateBundle(bundle: any): Promise<void> {
     for (const plugin of this.plugins) {
       if (plugin.generateBundle) {
-        await this.runHook(plugin, 'generateBundle', () =>
-          plugin.generateBundle!.call(this.getPluginContext(plugin), bundle)
-        );
+        await this.runHook(plugin, 'generateBundle', async () => {
+          const res = plugin.generateBundle!.call(this.getPluginContext(plugin), bundle);
+          return Promise.resolve(res);
+        });
       }
     }
   }
@@ -229,9 +238,10 @@ export class PluginContainer {
   async closeBundle(): Promise<void> {
     for (const plugin of this.plugins) {
       if (plugin.closeBundle) {
-        await this.runHook(plugin, 'closeBundle', () =>
-          plugin.closeBundle!.call(this.getPluginContext(plugin))
-        );
+        await this.runHook(plugin, 'closeBundle', async () => {
+          const res = plugin.closeBundle!.call(this.getPluginContext(plugin));
+          return Promise.resolve(res);
+        });
       }
     }
   }

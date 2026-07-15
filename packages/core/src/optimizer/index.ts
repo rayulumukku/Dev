@@ -1,9 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { build } from 'esbuild';
-import { init, parse } from 'es-module-lexer';
+import { fileURLToPath } from 'url';
+import { Worker } from 'worker_threads';
 import { Resolver } from '../resolver/index.js';
+import { init, parse } from 'es-module-lexer';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+let workerPath = path.join(__dirname, 'worker.js');
+if (!fs.existsSync(workerPath)) {
+  workerPath = path.join(__dirname, '../../dist/optimizer/worker.js');
+}
 
 interface OptimizerOptions {
   force?: boolean;
@@ -19,13 +27,31 @@ interface OptimizerResult {
   coldStart: boolean;
 }
 
+export class OptimizerGraph {
+  nodes: Map<string, { status: 'clean' | 'dirty' | 'rebuilding' | 'failed'; hash: string; deps: string[] }> = new Map();
+
+  register(dep: string, hash: string, deps: string[]) {
+    this.nodes.set(dep, { status: 'clean', hash, deps });
+  }
+
+  markDirty(dep: string) {
+    const node = this.nodes.get(dep);
+    if (node) {
+      node.status = 'dirty';
+    }
+  }
+
+  getStatus(dep: string): 'clean' | 'dirty' | 'rebuilding' | 'failed' {
+    return this.nodes.get(dep)?.status || 'dirty';
+  }
+}
+
 /**
  * Computes a collective hash of dependency versions, lockfiles, and configuration files.
  */
 function computeConfigHash(projectRoot: string, config: any): string {
   const hash = crypto.createHash('sha256');
 
-  // 1. Hash package.json dependencies
   const pkgJsonPath = path.join(projectRoot, 'package.json');
   if (fs.existsSync(pkgJsonPath)) {
     try {
@@ -36,7 +62,6 @@ function computeConfigHash(projectRoot: string, config: any): string {
     } catch {}
   }
 
-  // 2. Hash Lockfiles
   const lockfiles = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock'];
   for (const lock of lockfiles) {
     const lockPath = path.join(projectRoot, lock);
@@ -45,7 +70,6 @@ function computeConfigHash(projectRoot: string, config: any): string {
     }
   }
 
-  // 3. Hash Configuration options
   hash.update(JSON.stringify(config.optimizeDeps || {}));
   hash.update(JSON.stringify(config.define || {}));
 
@@ -141,6 +165,25 @@ export async function scanDeps(
   return deps;
 }
 
+function runWorker(payload: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(workerPath, { workerData: payload });
+    worker.on('message', (msg) => {
+      if (msg.success) {
+        resolve();
+      } else {
+        reject(new Error(msg.error));
+      }
+    });
+    worker.on('error', reject);
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Worker stopped with exit code ${code}`));
+      }
+    });
+  });
+}
+
 /**
  * Runs the optimization pipeline scanning, pre-bundling, and caching packages.
  */
@@ -175,12 +218,20 @@ export async function runOptimizer(
   const include = optimizeDepsConfig.include || [];
   const exclude = optimizeDepsConfig.exclude || [];
 
+  const graph = new OptimizerGraph();
+
   // Check cache hit
   if (!options.force && !optimizeDepsConfig.force && fs.existsSync(metadataPath)) {
     try {
       const savedMeta = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
       if (savedMeta.hash === currentHash) {
         const scanTime = Date.now() - startTime;
+        
+        // Populate OptimizerGraph with cached records
+        for (const [dep, fileUrl] of Object.entries(savedMeta.optimized || {})) {
+          graph.register(dep, currentHash, []);
+        }
+
         return {
           optimized: savedMeta.optimized || {},
           cacheHits: Object.keys(savedMeta.optimized || {}).length,
@@ -198,14 +249,15 @@ export async function runOptimizer(
   const deps = await scanDeps(projectRoot, resolver, include, exclude);
   const scanTimeMs = Date.now() - scanStart;
 
-  console.log(`[Ray Optimizer] Cache missed. Pre-bundling ${deps.size} dependencies...`);
+  console.log(`[Ray Optimizer] Cache missed. Pre-bundling ${deps.size} dependencies in parallel...`);
   fs.mkdirSync(cacheDir, { recursive: true });
 
   const optimized: Record<string, string> = {};
   const optStart = Date.now();
 
+  const workerTasks: Array<Promise<void>> = [];
+
   for (const dep of deps) {
-    // Exclude react/jsx-runtime from bundling directly (resolved on-demand)
     if (dep === 'react/jsx-runtime') continue;
 
     const resolved = resolver.resolveBarePackage(dep, projectRoot);
@@ -217,24 +269,30 @@ export async function runOptimizer(
     const outFileName = `${dep.replace(/\//g, '_')}.js`;
     const outFilePath = path.join(cacheDir, outFileName);
 
-    try {
-      await build({
-        entryPoints: [resolved],
-        bundle: true,
-        format: 'esm',
-        outfile: outFilePath,
-        minify: true,
-        define: {
-          'process.env.NODE_ENV': '"development"',
-        },
-        ...optimizeDepsConfig.esbuildOptions,
-      });
+    // Register node in optimizer graph as rebuilding
+    graph.register(dep, currentHash, []);
+    const node = graph.nodes.get(dep);
+    if (node) node.status = 'rebuilding';
 
+    // Queue worker compilation task
+    const task = runWorker({
+      resolvedPath: resolved,
+      dep,
+      outFilePath,
+      env: config.define || {}
+    }).then(() => {
       optimized[dep] = `/@ray/deps/${outFileName}`;
-    } catch (err: any) {
-      console.error(`[Ray Optimizer Error] Pre-bundling "${dep}" failed:`, err.message);
-    }
+      if (node) node.status = 'clean';
+    }).catch((err) => {
+      console.error(`[Ray Optimizer Error] Pre-bundling "${dep}" failed in worker:`, err.message);
+      if (node) node.status = 'failed';
+    });
+
+    workerTasks.push(task);
   }
+
+  // Await all parallel compilation tasks concurrently
+  await Promise.all(workerTasks);
 
   const optDuration = Date.now() - optStart;
 

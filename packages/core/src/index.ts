@@ -67,6 +67,7 @@ export { RayCloudClient } from './diagnostics/cloudClient.js';
 export { DistributedBuildExecutor } from './build/remoteExecutor.js';
 export { Scope, ScopeAnalyzer } from './compiler/scope.js';
 export { ASTVisitor } from './compiler/visitor.js';
+export { transformCjsToEsm } from './compiler/index.js';
 
 export class RayCore {
   resolver: Resolver;
