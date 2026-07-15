@@ -39,10 +39,58 @@ export class Parser {
       const stmt = this.parseStatement();
       if (stmt) body.push(stmt);
     }
-    return {
+    const program: Program = {
       type: NodeType.Program,
       body
     };
+    this.decorate(program);
+    return program;
+  }
+
+  private decorate(node: ASTNode) {
+    let tokenIdx = 0;
+    const walk = (n: ASTNode) => {
+      if (!n) return;
+      if (tokenIdx < this.tokens.length) {
+        n.loc = { line: this.tokens[tokenIdx].line, column: this.tokens[tokenIdx].column };
+      } else {
+        n.loc = { line: 1, column: 0 };
+      }
+      tokenIdx++;
+
+      if (n.type === NodeType.Program || n.type === NodeType.BlockStatement) {
+        if (Array.isArray(n.body)) n.body.forEach(walk);
+      } else if (n.type === NodeType.VariableDeclaration) {
+        if (Array.isArray(n.declarations)) n.declarations.forEach(walk);
+      } else if (n.type === NodeType.VariableDeclarator) {
+        walk(n.id);
+        if (n.init) walk(n.init);
+      } else if (n.type === NodeType.FunctionDeclaration) {
+        walk(n.id);
+        if (Array.isArray(n.params)) n.params.forEach(walk);
+        walk(n.body);
+      } else if (n.type === NodeType.ExportNamedDeclaration) {
+        walk(n.declaration);
+      } else if (n.type === NodeType.IfStatement) {
+        walk(n.test);
+        walk(n.consequent);
+        if (n.alternate) walk(n.alternate);
+      } else if (n.type === NodeType.BinaryExpression) {
+        walk(n.left);
+        walk(n.right);
+      } else if (n.type === NodeType.CallExpression) {
+        walk(n.callee);
+        if (Array.isArray(n.arguments)) n.arguments.forEach(walk);
+      } else if (n.type === NodeType.ExpressionStatement) {
+        walk(n.expression);
+      } else if (n.type === NodeType.MemberExpression) {
+        walk(n.object);
+        walk(n.property);
+      } else if (n.type === NodeType.JSXElement) {
+        if (Array.isArray(n.children)) n.children.forEach(walk);
+      }
+    };
+    walk(node);
   }
 
   private parseStatement(): ASTNode {

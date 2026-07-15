@@ -51,6 +51,8 @@ import { BuildScheduler } from './build/buildScheduler.js';
 import { RayCompiler } from './compiler/index.js';
 import { RayCloudClient } from './diagnostics/cloudClient.js';
 import { DistributedBuildExecutor } from './build/remoteExecutor.js';
+import { Scope, ScopeAnalyzer } from './compiler/scope.js';
+import { ASTVisitor } from './compiler/visitor.js';
 
 export { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
 export { displayStats } from './diagnostics/stats.js';
@@ -63,6 +65,8 @@ export { BuildScheduler } from './build/buildScheduler.js';
 export { RayCompiler } from './compiler/index.js';
 export { RayCloudClient } from './diagnostics/cloudClient.js';
 export { DistributedBuildExecutor } from './build/remoteExecutor.js';
+export { Scope, ScopeAnalyzer } from './compiler/scope.js';
+export { ASTVisitor } from './compiler/visitor.js';
 
 export class RayCore {
   resolver: Resolver;

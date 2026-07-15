@@ -1,26 +1,128 @@
 import { ASTNode, NodeType } from './ast.js';
 
+export interface SourceMap {
+  version: number;
+  file: string;
+  sources: string[];
+  mappings: string;
+  names: string[];
+}
+
 export class CodeGenerator {
   private minified: boolean;
+  private currentLine = 1;
+  private currentCol = 0;
+  private mappings: Array<{ genLine: number; genCol: number; origLine: number; origCol: number }> = [];
 
   constructor(minified = false) {
     this.minified = minified;
   }
 
+  private record(node: ASTNode) {
+    if (node && node.loc) {
+      this.mappings.push({
+        genLine: this.currentLine,
+        genCol: this.currentCol,
+        origLine: node.loc.line,
+        origCol: node.loc.column
+      });
+    }
+  }
+
+  private emit(str: string): string {
+    const lines = str.split('\n');
+    if (lines.length > 1) {
+      this.currentLine += lines.length - 1;
+      this.currentCol = lines[lines.length - 1].length;
+    } else {
+      this.currentCol += str.length;
+    }
+    return str;
+  }
+
+  generateWithSourceMap(node: ASTNode, sourceFile: string): { code: string; map: SourceMap } {
+    this.currentLine = 1;
+    this.currentCol = 0;
+    this.mappings = [];
+
+    const code = this.generate(node);
+
+    // Encode source map mappings to Base64 VLQ
+    let mappingsStr = '';
+    let lastSourceLine = 0;
+    let lastSourceCol = 0;
+    let lastGenCol = 0;
+
+    const lines: Record<number, any[]> = {};
+    for (const m of this.mappings) {
+      if (!lines[m.genLine]) lines[m.genLine] = [];
+      lines[m.genLine].push(m);
+    }
+
+    const genLinesCount = code.split('\n').length;
+    for (let i = 1; i <= genLinesCount; i++) {
+      if (i > 1) mappingsStr += ';';
+      const segs = lines[i] || [];
+      lastGenCol = 0;
+      const segStrs = segs.map(m => {
+        const dGenCol = m.genCol - lastGenCol;
+        const dSourceIndex = 0;
+        const dOrigLine = m.origLine - lastSourceLine;
+        const dOrigCol = m.origCol - lastSourceCol;
+
+        lastGenCol = m.genCol;
+        lastSourceLine = m.origLine;
+        lastSourceCol = m.origCol;
+
+        return this.encodeVLQ(dGenCol) + this.encodeVLQ(dSourceIndex) + this.encodeVLQ(dOrigLine) + this.encodeVLQ(dOrigCol);
+      });
+      mappingsStr += segStrs.join(',');
+    }
+
+    return {
+      code,
+      map: {
+        version: 3,
+        file: sourceFile,
+        sources: [sourceFile],
+        mappings: mappingsStr,
+        names: []
+      }
+    };
+  }
+
+  private encodeVLQ(value: number): string {
+    const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let sign = value < 0 ? 1 : 0;
+    let abs = Math.abs(value);
+    let vlq = (abs << 1) | sign;
+    let encoded = '';
+    do {
+      let digit = vlq & 31;
+      vlq >>>= 5;
+      if (vlq > 0) {
+        digit |= 32;
+      }
+      encoded += CHARS[digit];
+    } while (vlq > 0);
+    return encoded;
+  }
+
   generate(node: ASTNode): string {
     if (!node) return '';
+    this.record(node);
 
     const space = this.minified ? '' : ' ';
     const newline = this.minified ? '' : '\n';
 
     switch (node.type) {
       case NodeType.Program:
-        return node.body.map((child: any) => this.generate(child)).join(newline);
+        return this.emit(node.body.map((child: any) => this.generate(child)).join(newline));
 
       case NodeType.ImportDeclaration: {
         const specs = node.specifiers;
         if (specs.length === 0) {
-          return `import${space}${this.generate(node.source)};`;
+          return this.emit(`import${space}${this.generate(node.source)};`);
         }
 
         const specStrs = specs.map((spec: any) => {
@@ -30,14 +132,12 @@ export class CodeGenerator {
           if (spec.type === NodeType.ImportNamespaceSpecifier) {
             return `*${space}as${space}${this.generate(spec.local)}`;
           }
-          // Named import specifier
           const imported = this.generate(spec.imported);
           const local = this.generate(spec.local);
           if (imported === local) return imported;
           return `${imported}${space}as${space}${local}`;
         });
 
-        // Detect default vs named lists
         const defaultSpec = specs.find((s: any) => s.type === NodeType.ImportDefaultSpecifier);
         const nonDefaultSpecs = specs.filter((s: any) => s.type !== NodeType.ImportDefaultSpecifier);
 
@@ -60,95 +160,94 @@ export class CodeGenerator {
           }
         }
 
-        return `import${space}${importsPart}${space}from${space}${this.generate(node.source)};`;
+        return this.emit(`import${space}${importsPart}${space}from${space}${this.generate(node.source)};`);
       }
 
       case NodeType.ExportNamedDeclaration: {
         const prefix = node.isDefault ? `export${space}default${space}` : `export${space}`;
-        return `${prefix}${this.generate(node.declaration)}`;
+        return this.emit(`${prefix}${this.generate(node.declaration)}`);
       }
 
       case NodeType.VariableDeclaration: {
         const decls = node.declarations.map((d: any) => this.generate(d)).join(`,${space}`);
-        return `${node.kind}${space}${decls};`;
+        return this.emit(`${node.kind}${space}${decls};`);
       }
 
       case NodeType.VariableDeclarator: {
         const id = this.generate(node.id);
         const init = node.init ? `${space}=${space}${this.generate(node.init)}` : '';
-        return `${id}${init}`;
+        return this.emit(`${id}${init}`);
       }
 
       case NodeType.FunctionDeclaration: {
         const id = this.generate(node.id);
         const params = node.params.map((p: any) => this.generate(p)).join(`,${space}`);
         const body = this.generate(node.body);
-        return `function${space}${id}(${params})${space}${body}`;
+        return this.emit(`function${space}${id}(${params})${space}${body}`);
       }
 
       case NodeType.BlockStatement: {
         const body = node.body.map((s: any) => this.generate(s)).join(newline);
         if (this.minified) {
-          return `{${body}}`;
+          return this.emit(`{${body}}`);
         }
         const indented = body.split('\n').map((line: string) => '  ' + line).join('\n');
-        return `{\n${indented}\n}`;
+        return this.emit(`{\n${indented}\n}`);
       }
 
       case NodeType.IfStatement: {
         const test = this.generate(node.test);
         const cons = this.generate(node.consequent);
         const alt = node.alternate ? `${space}else${space}${this.generate(node.alternate)}` : '';
-        return `if${space}(${test})${space}${cons}${alt}`;
+        return this.emit(`if${space}(${test})${space}${cons}${alt}`);
       }
 
       case NodeType.ReturnStatement: {
         const arg = node.argument ? `${space}${this.generate(node.argument)}` : '';
-        return `return${arg};`;
+        return this.emit(`return${arg};`);
       }
 
       case NodeType.ExpressionStatement: {
-        return `${this.generate(node.expression)};`;
+        return this.emit(`${this.generate(node.expression)};`);
       }
 
       case NodeType.CallExpression: {
         const callee = this.generate(node.callee);
         const args = node.arguments.map((arg: any) => this.generate(arg)).join(`,${space}`);
-        return `${callee}(${args})`;
+        return this.emit(`${callee}(${args})`);
       }
 
       case NodeType.MemberExpression: {
         const obj = this.generate(node.object);
         const prop = this.generate(node.property);
-        return `${obj}.${prop}`;
+        return this.emit(`${obj}.${prop}`);
       }
 
       case NodeType.BinaryExpression: {
         const left = this.generate(node.left);
         const right = this.generate(node.right);
         const op = node.operator === '=>' ? `${space}=>${space}` : `${space}${node.operator}${space}`;
-        return `${left}${op}${right}`;
+        return this.emit(`${left}${op}${right}`);
       }
 
       case NodeType.Identifier:
-        return node.name;
+        return this.emit(node.name);
 
       case NodeType.Literal:
-        return node.raw !== undefined ? node.raw : JSON.stringify(node.value);
+        return this.emit(node.raw !== undefined ? node.raw : JSON.stringify(node.value));
 
       case 'ObjectExpression': {
         const props = node.properties.map((p: any) => this.generate(p)).join(`,${space}`);
-        return `{${space}${props}${space}}`;
+        return this.emit(`{${space}${props}${space}}`);
       }
 
       case 'Property': {
         const key = this.generate(node.key);
         const val = this.generate(node.value);
-        return `${key}:${space}${val}`;
+        return this.emit(`${key}:${space}${val}`);
       }
 
       default:
-        // Fallback safety
         return '';
     }
   }

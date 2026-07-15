@@ -50,7 +50,7 @@ describe('Native Ray Compiler Core Unit Tests', () => {
   });
 
   it('should optimize binary expressions via constant folding', () => {
-    const code = 'const sum = 1 + 2;';
+    const code = 'export const sum = 1 + 2;';
     const lexer = new Lexer(code);
     const tokens = lexer.tokenize();
     const parser = new Parser(tokens);
@@ -62,7 +62,7 @@ describe('Native Ray Compiler Core Unit Tests', () => {
     const codegen = new CodeGenerator();
     const output = codegen.generate(optimized);
 
-    expect(output).toContain('const sum = 3;');
+    expect(output).toContain('export const sum = 3;');
   });
 
   it('should eliminate dead-code branches of IfStatements', () => {

@@ -2,11 +2,12 @@ import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
 import { Transformer } from './transformer.js';
 import { Optimizer } from './optimizer.js';
-import { CodeGenerator } from './codegen.js';
+import { CodeGenerator, SourceMap } from './codegen.js';
 import { ASTNode } from './ast.js';
 
 export interface CompileResult {
   code: string;
+  map: SourceMap;
   ast: ASTNode;
   astNodesCount: number;
   parseTimeMs: number;
@@ -29,7 +30,6 @@ export class RayCompiler {
     const ast = parser.parse();
     const parseTimeMs = Number((performance.now() - startParse).toFixed(2));
 
-    // Calculate node counts in AST
     let nodeCount = 0;
     const countNodes = (n: any) => {
       if (!n) return;
@@ -61,11 +61,12 @@ export class RayCompiler {
 
     const startEmit = performance.now();
     const codegen = new CodeGenerator(options.minify);
-    const output = codegen.generate(optimizedAst);
+    const { code: output, map } = codegen.generateWithSourceMap(optimizedAst, file);
     const emitTimeMs = Number((performance.now() - startEmit).toFixed(2));
 
     return {
       code: output,
+      map,
       ast: optimizedAst,
       astNodesCount: nodeCount,
       parseTimeMs,
@@ -81,3 +82,5 @@ export { Optimizer } from './optimizer.js';
 export { CodeGenerator } from './codegen.js';
 export * from './ast.js';
 export * from './lexer.js';
+export { ASTVisitor } from './visitor.js';
+export { Scope, ScopeAnalyzer } from './scope.js';
