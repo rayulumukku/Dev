@@ -473,10 +473,10 @@ export async function startDevServer(options: DevServerOptions) {
       }
 
       // Check if file requires transformations through plugins
-      const isTransformable = ['.js', '.jsx', '.ts', '.tsx'].includes(ext);
+      const isImport = url.searchParams.has('import');
+      const isTransformable = ['.js', '.jsx', '.ts', '.tsx'].includes(ext) || isImport;
       const isCss = ext === '.css';
       const isHtml = ext === '.html';
-      const isImport = url.searchParams.has('import');
       const isAssetImport =
         isImport &&
         ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(
@@ -509,7 +509,7 @@ export async function startDevServer(options: DevServerOptions) {
 
       if (isTransformable && ray) {
         const rawCode = await fs.readFile(filePath, 'utf-8');
-        const finalCode = await ray.transform(rawCode, filePath);
+        const finalCode = await ray.transform(rawCode, isImport ? filePath + '?import' : filePath);
 
         res.writeHead(200, {
           'Content-Type': 'application/javascript',

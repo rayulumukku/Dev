@@ -549,16 +549,19 @@ export class CodeGenerator {
       }
 
       case NodeType.Property: {
+        let key = node.computed ? `[${this.generate(node.key)}]` : this.generate(node.key);
+        if (!node.computed && typeof key === 'string' && !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
+          key = JSON.stringify(key);
+        }
+
         if (node.method) {
           const asyncStr = node.value?.async ? `async${s}` : '';
           const genStr = node.value?.generator ? '*' : '';
-          const key = node.computed ? `[${this.generate(node.key)}]` : this.generate(node.key);
           const params = node.value?.params?.map((p: any) => this.generate(p)).join(`,${s}`) ?? '';
           const body = this.generate(node.value?.body);
           const kindPrefix = node.kind === 'get' ? `get${s}` : node.kind === 'set' ? `set${s}` : '';
           return this.emit(`${kindPrefix}${asyncStr}${genStr}${key}(${params})${s}${body}`);
         }
-        const key = node.computed ? `[${this.generate(node.key)}]` : this.generate(node.key);
         if (node.shorthand) {
           const val = this.generate(node.value);
           // If shorthand with default: x = 5

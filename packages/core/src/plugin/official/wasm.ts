@@ -10,7 +10,7 @@ export function wasmPlugin(): RayPlugin {
     name: '@ray/plugin-wasm',
 
     async transform(code, id) {
-      if (!id.endsWith('.wasm')) return null;
+      if (!id.includes('.wasm')) return null;
 
       const cleanId = id.split('?')[0];
       const relPath = '/' + path.relative(this.projectRoot, cleanId).replace(/\\/g, '/');

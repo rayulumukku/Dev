@@ -15,7 +15,7 @@ const _req = createRequire(import.meta.url);
 
 let _compiler: any = null;
 
-function getCompiler(): any {
+async function getCompiler(): Promise<any> {
   if (_compiler) return _compiler;
   // Resolve RayCompiler from the compiled @ray/core dist output
   const candidates = [
@@ -25,7 +25,8 @@ function getCompiler(): any {
   let RayCompiler: any = null;
   for (const c of candidates) {
     try {
-      const mod = _req(c);
+      const fileUrl = new URL(`file://${c.replace(/\\/g, '/')}`).toString();
+      const mod = await import(fileUrl);
       RayCompiler = mod.RayCompiler;
       if (RayCompiler) break;
     } catch { /* next */ }
@@ -41,7 +42,7 @@ function getCompiler(): any {
  */
 export async function transformJsx(code: string, filename: string): Promise<string> {
   try {
-    const compiler = getCompiler();
+    const compiler = await getCompiler();
     const result = compiler.compile(code, filename);
     return result.code;
   } catch (err: any) {
@@ -59,7 +60,7 @@ export async function transformFile(
   options: { minify?: boolean } = {}
 ): Promise<{ code: string; map?: string }> {
   try {
-    const compiler = getCompiler();
+    const compiler = await getCompiler();
     const result = compiler.compile(code, filename, options);
     return {
       code: result.code,

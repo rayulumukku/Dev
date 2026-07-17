@@ -9,7 +9,7 @@ export function mdxPlugin(): RayPlugin {
     name: '@ray/plugin-mdx',
 
     async transform(code, id) {
-      if (!id.endsWith('.mdx') && !id.endsWith('.md')) return null;
+      if (!id.includes('.mdx') && !id.includes('.md')) return null;
 
       let md = code;
       const frontmatter: Record<string, string> = {};

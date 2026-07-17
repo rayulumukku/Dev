@@ -189,7 +189,13 @@ export class Parser {
 
     if (token.type === TokenType.Keyword) {
       switch (token.value) {
-        case 'import': return this.parseImportDeclaration();
+        case 'import': {
+          const next = this.peek2();
+          if (next && next.value === '.') {
+            return this.parseExpressionStatement();
+          }
+          return this.parseImportDeclaration();
+        }
         case 'export': return this.parseExportDeclaration();
         case 'const':
         case 'let':
@@ -2151,7 +2157,15 @@ export class Parser {
         continue;
       }
 
-      const name = this.advance().value;
+      let name = '';
+      if (this.match(TokenType.Identifier)) {
+        name += this.advance().value;
+        while (this.match(TokenType.Punctuator, '-') || this.match(TokenType.Identifier)) {
+          name += this.advance().value;
+        }
+      } else {
+        name = this.advance().value;
+      }
 
       if (this.eat(TokenType.Punctuator, '=')) {
         let valNode: ASTNode;
@@ -2195,9 +2209,15 @@ export class Parser {
           children.push(this.parseJSXElement());
         } else if (this.peek().value === '{') {
           this.advance();
+          let expr: ASTNode;
+          if (this.match(TokenType.Punctuator, '}')) {
+            expr = { type: 'JSXEmptyExpression' };
+          } else {
+            expr = this.parseExpression();
+          }
           children.push({
             type: NodeType.JSXExpressionContainer,
-            expression: this.parseExpression()
+            expression: expr
           });
           this.consume(TokenType.Punctuator, '}');
         } else {

@@ -381,6 +381,14 @@ export class Transformer {
       return this.transformJSXFragment(node);
     }
 
+    if (node.type === NodeType.JSXText) {
+      return {
+        type: NodeType.Literal,
+        value: node.value,
+        raw: JSON.stringify(node.value),
+      };
+    }
+
     return node;
   }
 
@@ -425,7 +433,8 @@ export class Transformer {
 
     const childNodes = node.children
       .filter((child: any) => child.type !== NodeType.JSXText || child.value.trim() !== '')
-      .map((child: any) => this.visit(child));
+      .map((child: any) => this.visit(child))
+      .filter((child: any) => child != null && child.type !== 'JSXEmptyExpression');
 
     if (this.options.jsxRuntime === 'automatic') {
       return this.transformJSXAutomatic(tagExpr, propsEntries, childNodes);

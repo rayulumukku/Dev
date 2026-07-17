@@ -81,7 +81,8 @@ export function jsxPlugin(): RayPlugin {
                 rewrittenSpecifier = '/' + rel;
                 const isCss = path.extname(resolvedPath) === '.css';
                 const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(path.extname(resolvedPath).toLowerCase());
-                if (isCss || isAsset) {
+                const isJsLoader = ['.mdx', '.md', '.wasm', '.json'].includes(path.extname(resolvedPath).toLowerCase());
+                if (isCss || isAsset || isJsLoader) {
                   rewrittenSpecifier += '?import';
                 }
               }
