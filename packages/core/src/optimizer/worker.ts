@@ -24,9 +24,13 @@ async function execute() {
     }
 
     const visited = new Set<string>();
+    const inlinedVars = new Map<string, string>();
 
     function inlineBundle(filePath: string, depName?: string): string {
       const normPath = normalizePath(filePath);
+      if (depName) {
+        inlinedVars.set(normPath, depName);
+      }
       if (visited.has(normPath)) return '';
       visited.add(normPath);
 
@@ -97,7 +101,7 @@ async function execute() {
           }
           if (names.length > 0) {
             const importMatch = new RegExp(`import\\s+(\\w+)\\s+from\\s+['"](?:\\.\\/|\\.\\.\\/)${relPath.replace(/\./g, '\\.')}['"]`).exec(fileContent);
-            const nestedVar = importMatch ? importMatch[1] : `__dep_${Math.random().toString(36).substring(2, 8)}__`;
+            const nestedVar = importMatch ? importMatch[1] : (inlinedVars.get(normNested) || `__dep_${Math.random().toString(36).substring(2, 8)}__`);
             return names.map(name => `export const ${name} = ${nestedVar}.${name};`).join('\n');
           }
           return `/* Inlined export * from: ${path.basename(normNested)} */`;
@@ -128,6 +132,14 @@ async function execute() {
       bundledCode = fs.readFileSync(resolvedPath, 'utf-8');
       if (bundledCode.includes('module.exports') || bundledCode.includes('exports.') || bundledCode.includes('require(')) {
         bundledCode = transformCjsToEsm(bundledCode);
+      }
+    }
+
+    // Replace define/env variables
+    if (env) {
+      for (const [key, value] of Object.entries(env)) {
+        const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        bundledCode = bundledCode.replace(new RegExp(escapedKey, 'g'), value);
       }
     }
 

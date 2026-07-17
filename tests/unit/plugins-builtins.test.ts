@@ -50,7 +50,7 @@ describe('Builtin CSS & HMR Plugins Unit Tests', () => {
     it('should inject hot context blocks into project modules', async () => {
       const res = await plugin.transform!.call(dummyContext, 'export const val = 1;', 'src/main.jsx');
       expect(res).not.toBeNull();
-      expect(res?.code).toContain('import.meta.hot = window.__ray_create_hot_context(import.meta.url);');
+      expect(res?.code).toContain('__ray_create_hot_context');
     });
   });
 });

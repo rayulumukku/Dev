@@ -21,7 +21,8 @@ export function jsxPlugin(): RayPlugin {
   return {
     name: 'ray:jsx',
     async transform(code: any, id: string) {
-      if (!['.js', '.jsx', '.ts', '.tsx'].some(ext => id.endsWith(ext))) {
+      const cleanId = id.split('?')[0];
+      if (!['.js', '.jsx', '.ts', '.tsx', '.mdx', '.md'].some(ext => cleanId.endsWith(ext))) {
         return null;
       }
 
@@ -53,7 +54,70 @@ export function jsxPlugin(): RayPlugin {
         } catch (err: any) {
           // Parse error → fall through with raw JS, transformJsx handles remaining cases
           jsCode = await transformJsx(rawCode, id);
-          return { code: jsCode };
+          
+          let rewritten = jsCode.replace(
+            /(\b(?:import|export)\s+[\w\s*{},\$]+from\s+['"])([^'"]+)(['"])/g,
+            (match, prefix, specifier, suffix) => {
+              try {
+                let resolvedPath = specifier.startsWith('\0virtual:')
+                  ? specifier
+                  : resolve(specifier, id, this.resolver, this.projectRoot);
+                if (resolvedPath.startsWith('\0virtual:')) {
+                  const virtName = resolvedPath.slice('\0virtual:'.length);
+                  return `${prefix}/@virtual/${virtName}?import${suffix}`;
+                } else if (resolvedPath.includes('node_modules')) {
+                  const idx = resolvedPath.indexOf('node_modules');
+                  const rel = resolvedPath.slice(idx + 'node_modules/'.length).replace(/\\/g, '/');
+                  return `${prefix}/@modules/${rel}${suffix}`;
+                } else {
+                  const rel = path.relative(this.projectRoot, resolvedPath).replace(/\\/g, '/');
+                  let rewrittenSpecifier = '/' + rel;
+                  const isCss = path.extname(resolvedPath) === '.css';
+                  const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(path.extname(resolvedPath).toLowerCase());
+                  const isJsLoader = ['.mdx', '.md', '.wasm', '.json'].includes(path.extname(resolvedPath).toLowerCase());
+                  if (isCss || isAsset || isJsLoader) {
+                    rewrittenSpecifier += '?import';
+                  }
+                  return `${prefix}${rewrittenSpecifier}${suffix}`;
+                }
+              } catch {
+                return match;
+              }
+            }
+          );
+
+          rewritten = rewritten.replace(
+            /(\bimport\s+['"])([^'"]+)(['"])/g,
+            (match, prefix, specifier, suffix) => {
+              try {
+                let resolvedPath = specifier.startsWith('\0virtual:')
+                  ? specifier
+                  : resolve(specifier, id, this.resolver, this.projectRoot);
+                if (resolvedPath.startsWith('\0virtual:')) {
+                  const virtName = resolvedPath.slice('\0virtual:'.length);
+                  return `${prefix}/@virtual/${virtName}?import${suffix}`;
+                } else if (resolvedPath.includes('node_modules')) {
+                  const idx = resolvedPath.indexOf('node_modules');
+                  const rel = resolvedPath.slice(idx + 'node_modules/'.length).replace(/\\/g, '/');
+                  return `${prefix}/@modules/${rel}${suffix}`;
+                } else {
+                  const rel = path.relative(this.projectRoot, resolvedPath).replace(/\\/g, '/');
+                  let rewrittenSpecifier = '/' + rel;
+                  const isCss = path.extname(resolvedPath) === '.css';
+                  const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf'].includes(path.extname(resolvedPath).toLowerCase());
+                  const isJsLoader = ['.mdx', '.md', '.wasm', '.json'].includes(path.extname(resolvedPath).toLowerCase());
+                  if (isCss || isAsset || isJsLoader) {
+                    rewrittenSpecifier += '?import';
+                  }
+                  return `${prefix}${rewrittenSpecifier}${suffix}`;
+                }
+              } catch {
+                return match;
+              }
+            }
+          );
+
+          return { code: rewritten };
         }
       }
 
@@ -72,6 +136,8 @@ export function jsxPlugin(): RayPlugin {
               if (resolvedPath.startsWith('\0virtual:')) {
                 const virtName = resolvedPath.slice('\0virtual:'.length);
                 rewrittenSpecifier = `/@virtual/${virtName}?import`;
+              } else if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+                rewrittenSpecifier = `/@modules/${specifier}`;
               } else if (resolvedPath.includes('node_modules')) {
                 const idx = resolvedPath.indexOf('node_modules');
                 const rel = resolvedPath.slice(idx + 'node_modules/'.length).replace(/\\/g, '/');

@@ -38,10 +38,17 @@ export function htmlPlugin(): RayPlugin {
       // 2. Inject HMR script tag if building or serving in development mode
       let finalHtml = code;
       if (this.buildMode === 'development') {
-        if (finalHtml.includes('</body>')) {
+        // Strip any existing hardcoded HMR tags first to avoid duplicates
+        finalHtml = finalHtml.replace(/<script\s+[^>]*src=["']\/@ray\/hmr\.js["'][^>]*><\/script>/gi, '');
+
+        if (finalHtml.includes('<head>')) {
+          finalHtml = finalHtml.replace('<head>', '<head>\n  <script type="module" src="/@ray/hmr.js"></script>');
+        } else if (finalHtml.includes('<body>')) {
+          finalHtml = finalHtml.replace('<body>', '<body>\n  <script type="module" src="/@ray/hmr.js"></script>');
+        } else if (finalHtml.includes('</body>')) {
           finalHtml = finalHtml.replace('</body>', '  <script type="module" src="/@ray/hmr.js"></script>\n</body>');
         } else {
-          finalHtml = finalHtml + '\n<script type="module" src="/@ray/hmr.js"></script>';
+          finalHtml = '<script type="module" src="/@ray/hmr.js"></script>\n' + finalHtml;
         }
       }
 

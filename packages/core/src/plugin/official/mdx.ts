@@ -7,6 +7,7 @@ import { RayPlugin } from '../index.js';
 export function mdxPlugin(): RayPlugin {
   return {
     name: '@ray/plugin-mdx',
+    enforce: 'pre',
 
     async transform(code, id) {
       if (!id.includes('.mdx') && !id.includes('.md')) return null;

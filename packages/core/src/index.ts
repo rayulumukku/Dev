@@ -30,6 +30,13 @@ import { mdxPlugin } from './plugin/official/mdx.js';
 import { wasmPlugin } from './plugin/official/wasm.js';
 import { jsonPlugin } from './plugin/official/json.js';
 import { copyPlugin } from './plugin/official/copy.js';
+import { vuePlugin } from './plugin/official/vue.js';
+import { solidPlugin } from './plugin/official/solid.js';
+import { sveltePlugin } from './plugin/official/svelte.js';
+import { tailwindPlugin } from './plugin/official/tailwind.js';
+import { eslintPlugin } from './plugin/official/eslint.js';
+import { pwaPlugin } from './plugin/official/pwa.js';
+import { imagePlugin } from './plugin/official/image.js';
 
 export const react = reactPlugin;
 export const svg = svgPlugin;
@@ -37,6 +44,13 @@ export const mdx = mdxPlugin;
 export const wasm = wasmPlugin;
 export const json = jsonPlugin;
 export const copy = copyPlugin;
+export const vue = vuePlugin;
+export const solid = solidPlugin;
+export const svelte = sveltePlugin;
+export const tailwind = tailwindPlugin;
+export const eslint = eslintPlugin;
+export const pwa = pwaPlugin;
+export const image = imagePlugin;
 export * from './plugin/index.js';
 
 import { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
@@ -247,7 +261,12 @@ export class RayCore {
         };
       });
 
-      return cached.code;
+      let finalCode = cached.code;
+      if (cached.map && !finalCode.includes('sourceMappingURL=')) {
+        const mapBase64 = Buffer.from(typeof cached.map === 'string' ? cached.map : JSON.stringify(cached.map)).toString('base64');
+        finalCode += `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${mapBase64}`;
+      }
+      return finalCode;
     }
 
     // Cache miss: compile module
@@ -256,9 +275,15 @@ export class RayCore {
     const result = await this.container.transform(code, file);
     const transformDuration = performance.now() - startTransform;
 
+    let finalCode = result.code;
+    if (result.map) {
+      const mapBase64 = Buffer.from(JSON.stringify(result.map)).toString('base64');
+      finalCode += `\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,${mapBase64}`;
+    }
+
     node.status = 'clean';
     node.hash = contentHash;
-    node.cachedOutput = { code: result.code, map: result.map };
+    node.cachedOutput = { code: finalCode, map: result.map };
     if (!node.ast) {
       node.ast = { type: 'Program', body: [] };
     }
@@ -267,7 +292,7 @@ export class RayCore {
     const importers = Array.from(this.graph.getImporters(cleanPath));
 
     this.cacheStore.set(cleanPath, contentHash, {
-      code: result.code,
+      code: finalCode,
       map: result.map,
       ast: node.ast,
       deps,
@@ -276,7 +301,7 @@ export class RayCore {
     });
     this.cacheStore.save();
 
-    return result.code;
+    return finalCode;
   }
 
   invalidate(id: string): void {
@@ -349,6 +374,9 @@ export class RayCore {
       outFile: tmpOut,
       format: 'esm',
       external: externals,
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(this.mode || 'development'),
+      },
     });
     try { fs.unlinkSync(tmpOut); } catch {}
     let rewrittenCode = output.code.replace(

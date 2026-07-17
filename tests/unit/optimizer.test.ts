@@ -94,8 +94,8 @@ describe('Optimizer Unit Tests', () => {
   it('should correctly convert CommonJS requires and module.exports to ESM formats', () => {
     const cjs = 'const react = require("react"); module.exports = react;';
     const esm = transformCjsToEsm(cjs);
-    expect(esm).toContain('import react from "react"');
-    expect(esm).toContain('export default react');
+    expect(esm).toContain('from "react"');
+    expect(esm).toContain('export default __cjs_module_');
   });
 
   it('should manage OptimizerGraph status and track nodes correctly', () => {

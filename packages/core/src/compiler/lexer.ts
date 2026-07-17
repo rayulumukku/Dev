@@ -40,6 +40,7 @@ export class Lexer {
   private line = 1;
   private column = 1;
   private templateDepth = 0;
+  private contextStack: string[] = [];
 
   constructor(source: string) {
     this.source = source;
@@ -87,6 +88,33 @@ export class Lexer {
     return false;
   }
 
+  private updateContext(val: string) {
+    if (val === '{') {
+      const top = this.contextStack[this.contextStack.length - 1];
+      if (top === 'jsx-child' || top === 'jsx-tag') {
+        this.contextStack.push('jsx-expr');
+      } else if (top === 'jsx-expr' || top === 'brace') {
+        this.contextStack.push('brace');
+      }
+    } else if (val === '}') {
+      const top = this.contextStack[this.contextStack.length - 1];
+      if (top === 'brace') {
+        this.contextStack.pop();
+      } else if (top === 'jsx-expr') {
+        this.contextStack.pop();
+      }
+    } else if (val === '>') {
+      if (this.contextStack[this.contextStack.length - 1] === 'jsx-tag') {
+        this.contextStack.pop();
+        this.contextStack.push('jsx-child');
+      }
+    } else if (val === '/>') {
+      if (this.contextStack[this.contextStack.length - 1] === 'jsx-tag') {
+        this.contextStack.pop();
+      }
+    }
+  }
+
   tokenize(): Token[] {
     const tokens: Token[] = [];
     let lastToken: Token | null = null;
@@ -95,6 +123,19 @@ export class Lexer {
       const startLine = this.line;
       const startColumn = this.column;
       const char = this.peek();
+
+      if (this.contextStack[this.contextStack.length - 1] === 'jsx-child') {
+        if (char !== '<' && char !== '{') {
+          let value = '';
+          while (this.index < this.length && this.peek() !== '<' && this.peek() !== '{') {
+            value += this.advance();
+          }
+          const t: Token = { type: TokenType.StringLiteral, value, line: startLine, column: startColumn };
+          tokens.push(t);
+          lastToken = t;
+          continue;
+        }
+      }
 
       // Whitespace
       if (/\s/.test(char)) {
@@ -155,6 +196,9 @@ export class Lexer {
         const t: Token = { type: TokenType.JSXTagClose, value: tagVal, line: startLine, column: startColumn };
         tokens.push(t);
         lastToken = t;
+        if (this.contextStack[this.contextStack.length - 1] === 'jsx-child') {
+          this.contextStack.pop();
+        }
         continue;
       }
 
@@ -174,6 +218,7 @@ export class Lexer {
           const t: Token = { type: TokenType.JSXTagOpen, value: tagVal, line: startLine, column: startColumn };
           tokens.push(t);
           lastToken = t;
+          this.contextStack.push('jsx-tag');
           continue;
         }
       }
@@ -245,6 +290,7 @@ export class Lexer {
       if (tok) {
         tokens.push(tok);
         lastToken = tok;
+        this.updateContext(tok.value);
         continue;
       }
 
@@ -253,6 +299,7 @@ export class Lexer {
       const t: Token = { type: TokenType.Punctuator, value: puncVal, line: startLine, column: startColumn };
       tokens.push(t);
       lastToken = t;
+      this.updateContext(puncVal);
     }
 
     tokens.push({ type: TokenType.EOF, value: '', line: this.line, column: this.column });

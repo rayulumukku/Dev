@@ -279,7 +279,10 @@ export async function runOptimizer(
       resolvedPath: resolved,
       dep,
       outFilePath,
-      env: config.define || {}
+      env: {
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+        ...(config.define || {})
+      }
     }).then(() => {
       optimized[dep] = `/@ray/deps/${outFileName}`;
       if (node) node.status = 'clean';

@@ -10,16 +10,17 @@ export class Optimizer {
 
   private visit(node: ASTNode, scope: Scope, parentType?: string): ASTNode {
     if (!node) return node;
+    const currentScope = (node as any)._scope || scope;
 
     // Recurse children
     if (node.type === NodeType.Program) {
-      node.body = node.body.map((child: any) => this.visit(child, scope, node.type)).filter(Boolean);
+      node.body = node.body.map((child: any) => this.visit(child, currentScope, node.type)).filter(Boolean);
       return node;
     }
 
     if (node.type === NodeType.ExportNamedDeclaration) {
       if (node.declaration) {
-        node.declaration = this.visit(node.declaration, scope, node.type);
+        node.declaration = this.visit(node.declaration, currentScope, node.type);
       }
       return node;
     }
@@ -28,13 +29,13 @@ export class Optimizer {
       node.declarations = node.declarations
         .map((decl: any) => {
           if (parentType !== NodeType.ExportNamedDeclaration && decl.id.type === NodeType.Identifier) {
-            const binding = scope.getBinding(decl.id.name);
+            const binding = currentScope.getBinding(decl.id.name);
             if (binding && binding.referencesCount === 0) {
               console.log(`[Ray Tree Shaking] Pruned unreferenced variable: ${decl.id.name}`);
               return null;
             }
           }
-          return this.visit(decl, scope, node.type);
+          return this.visit(decl, currentScope, node.type);
         })
         .filter(Boolean);
 
@@ -46,14 +47,14 @@ export class Optimizer {
 
     if (node.type === NodeType.VariableDeclarator) {
       if (node.init) {
-        node.init = this.visit(node.init, scope, node.type);
+        node.init = this.visit(node.init, currentScope, node.type);
       }
       return node;
     }
 
     if (node.type === NodeType.FunctionDeclaration) {
       if (parentType !== NodeType.ExportNamedDeclaration && node.id?.name) {
-        const binding = scope.getBinding(node.id.name);
+        const binding = currentScope.getBinding(node.id.name);
         if (binding && binding.referencesCount === 0) {
           console.log(`[Ray Tree Shaking] Pruned unreferenced function: ${node.id.name}`);
           return null as any;
@@ -61,79 +62,79 @@ export class Optimizer {
       }
 
       if (node.body) {
-        node.body = this.visit(node.body, scope, node.type);
+        node.body = this.visit(node.body, currentScope, node.type);
       }
       return node;
     }
 
     if (node.type === NodeType.ArrowFunctionExpression) {
-      node.body = this.visit(node.body, scope, node.type);
+      node.body = this.visit(node.body, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.ClassDeclaration) {
       if (parentType !== NodeType.ExportNamedDeclaration && node.id?.name) {
-        const binding = scope.getBinding(node.id.name);
+        const binding = currentScope.getBinding(node.id.name);
         if (binding && binding.referencesCount === 0) {
           console.log(`[Ray Tree Shaking] Pruned unreferenced class: ${node.id.name}`);
           return null as any;
         }
       }
       if (node.body) {
-        node.body = this.visit(node.body, scope, node.type);
+        node.body = this.visit(node.body, currentScope, node.type);
       }
       return node;
     }
 
     if (node.type === NodeType.ClassBody) {
-      node.body = node.body.map((child: any) => this.visit(child, scope, node.type)).filter(Boolean);
+      node.body = node.body.map((child: any) => this.visit(child, currentScope, node.type)).filter(Boolean);
       return node;
     }
 
     if (node.type === NodeType.MethodDefinition || node.type === NodeType.PropertyDefinition) {
-      if (node.value) node.value = this.visit(node.value, scope, node.type);
+      if (node.value) node.value = this.visit(node.value, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.BlockStatement) {
-      node.body = node.body.map((child: any) => this.visit(child, scope, node.type)).filter(Boolean);
+      node.body = node.body.map((child: any) => this.visit(child, currentScope, node.type)).filter(Boolean);
       return node;
     }
 
     if (node.type === NodeType.ReturnStatement || node.type === NodeType.ThrowStatement) {
       if (node.argument) {
-        node.argument = this.visit(node.argument, scope, node.type);
+        node.argument = this.visit(node.argument, currentScope, node.type);
       }
       return node;
     }
 
     if (node.type === NodeType.ExpressionStatement) {
-      node.expression = this.visit(node.expression, scope, node.type);
+      node.expression = this.visit(node.expression, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.CallExpression || node.type === NodeType.OptionalCallExpression || node.type === NodeType.NewExpression) {
-      node.callee = this.visit(node.callee, scope, node.type);
-      node.arguments = node.arguments.map((arg: any) => this.visit(arg, scope, node.type));
+      node.callee = this.visit(node.callee, currentScope, node.type);
+      node.arguments = node.arguments.map((arg: any) => this.visit(arg, currentScope, node.type));
       return node;
     }
 
     if (node.type === NodeType.MemberExpression || node.type === NodeType.OptionalMemberExpression) {
-      node.object = this.visit(node.object, scope, node.type);
-      if (node.computed) node.property = this.visit(node.property, scope, node.type);
+      node.object = this.visit(node.object, currentScope, node.type);
+      if (node.computed) node.property = this.visit(node.property, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.AssignmentExpression) {
-      node.left = this.visit(node.left, scope, node.type);
-      node.right = this.visit(node.right, scope, node.type);
+      node.left = this.visit(node.left, currentScope, node.type);
+      node.right = this.visit(node.right, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.ConditionalExpression) {
-      node.test = this.visit(node.test, scope, node.type);
-      node.consequent = this.visit(node.consequent, scope, node.type);
-      node.alternate = this.visit(node.alternate, scope, node.type);
+      node.test = this.visit(node.test, currentScope, node.type);
+      node.consequent = this.visit(node.consequent, currentScope, node.type);
+      node.alternate = this.visit(node.alternate, currentScope, node.type);
 
       // Constant-fold conditional
       if (node.test.type === NodeType.Literal) {
@@ -143,43 +144,44 @@ export class Optimizer {
     }
 
     if (node.type === NodeType.UnaryExpression || node.type === NodeType.UpdateExpression) {
-      node.argument = this.visit(node.argument, scope, node.type);
+      node.argument = this.visit(node.argument, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.AwaitExpression || node.type === NodeType.YieldExpression) {
-      if (node.argument) node.argument = this.visit(node.argument, scope, node.type);
+      if (node.argument) node.argument = this.visit(node.argument, currentScope, node.type);
       return node;
     }
 
     // ── Loops ──
     if (node.type === NodeType.ForStatement) {
-      if (node.init) node.init = this.visit(node.init, scope, node.type);
-      if (node.test) node.test = this.visit(node.test, scope, node.type);
-      if (node.update) node.update = this.visit(node.update, scope, node.type);
-      node.body = this.visit(node.body, scope, node.type);
+      if (node.init) node.init = this.visit(node.init, currentScope, node.type);
+      if (node.test) node.test = this.visit(node.test, currentScope, node.type);
+      if (node.update) node.update = this.visit(node.update, currentScope, node.type);
+      node.body = this.visit(node.body, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.ForInStatement || node.type === NodeType.ForOfStatement) {
-      node.left = this.visit(node.left, scope, node.type);
-      node.right = this.visit(node.right, scope, node.type);
-      node.body = this.visit(node.body, scope, node.type);
+      node.left = this.visit(node.left, currentScope, node.type);
+      node.right = this.visit(node.right, currentScope, node.type);
+      node.body = this.visit(node.body, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.WhileStatement || node.type === NodeType.DoWhileStatement) {
-      node.test = this.visit(node.test, scope, node.type);
-      node.body = this.visit(node.body, scope, node.type);
+      node.test = this.visit(node.test, currentScope, node.type);
+      node.body = this.visit(node.body, currentScope, node.type);
       return node;
     }
 
     // ── Switch ──
     if (node.type === NodeType.SwitchStatement) {
-      node.discriminant = this.visit(node.discriminant, scope, node.type);
+      node.discriminant = this.visit(node.discriminant, currentScope, node.type);
       node.cases = node.cases.map((c: any) => {
-        if (c.test) c.test = this.visit(c.test, scope, node.type);
-        c.consequent = c.consequent.map((s: any) => this.visit(s, scope, node.type)).filter(Boolean);
+        const cScope = (c as any)._scope || currentScope;
+        if (c.test) c.test = this.visit(c.test, cScope, node.type);
+        c.consequent = c.consequent.map((s: any) => this.visit(s, cScope, node.type)).filter(Boolean);
         return c;
       });
       return node;
@@ -187,38 +189,39 @@ export class Optimizer {
 
     // ── Try / Catch ──
     if (node.type === NodeType.TryStatement) {
-      node.block = this.visit(node.block, scope, node.type);
-      if (node.handler) node.handler.body = this.visit(node.handler.body, scope, node.type);
-      if (node.finalizer) node.finalizer = this.visit(node.finalizer, scope, node.type);
+      node.block = this.visit(node.block, currentScope, node.type);
+      if (node.handler) node.handler.body = this.visit(node.handler.body, currentScope, node.type);
+      if (node.finalizer) node.finalizer = this.visit(node.finalizer, currentScope, node.type);
       return node;
     }
 
     // ── Template Literal ──
     if (node.type === NodeType.TemplateLiteral) {
-      node.expressions = node.expressions.map((e: any) => this.visit(e, scope, node.type));
+      node.expressions = node.expressions.map((e: any) => this.visit(e, currentScope, node.type));
       return node;
     }
 
     if (node.type === NodeType.TaggedTemplateExpression) {
-      node.tag = this.visit(node.tag, scope, node.type);
-      node.quasi = this.visit(node.quasi, scope, node.type);
+      node.tag = this.visit(node.tag, currentScope, node.type);
+      node.quasi = this.visit(node.quasi, currentScope, node.type);
       return node;
     }
 
     // ── Array / Object / Spread ──
     if (node.type === NodeType.ArrayExpression) {
-      node.elements = (node.elements || []).map((e: any) => e ? this.visit(e, scope, node.type) : e);
+      node.elements = (node.elements || []).map((e: any) => e ? this.visit(e, currentScope, node.type) : e);
       return node;
     }
 
     if (node.type === NodeType.ObjectExpression || node.type === 'ObjectExpression') {
       if (node.properties) {
         node.properties = node.properties.map((p: any) => {
+          const pScope = (p as any)._scope || currentScope;
           if (p.type === NodeType.SpreadElement) {
-            p.argument = this.visit(p.argument, scope, node.type);
+            p.argument = this.visit(p.argument, pScope, node.type);
             return p;
           }
-          if (p.value) p.value = this.visit(p.value, scope, node.type);
+          if (p.value) p.value = this.visit(p.value, pScope, node.type);
           return p;
         });
       }
@@ -226,19 +229,19 @@ export class Optimizer {
     }
 
     if (node.type === NodeType.SpreadElement) {
-      node.argument = this.visit(node.argument, scope, node.type);
+      node.argument = this.visit(node.argument, currentScope, node.type);
       return node;
     }
 
     if (node.type === NodeType.SequenceExpression) {
-      node.expressions = node.expressions.map((e: any) => this.visit(e, scope, node.type));
+      node.expressions = node.expressions.map((e: any) => this.visit(e, currentScope, node.type));
       return node;
     }
 
     // ── Logical Expression Constant Folding ──
     if (node.type === NodeType.LogicalExpression) {
-      node.left = this.visit(node.left, scope, node.type);
-      node.right = this.visit(node.right, scope, node.type);
+      node.left = this.visit(node.left, currentScope, node.type);
+      node.right = this.visit(node.right, currentScope, node.type);
 
       if (node.left.type === NodeType.Literal && node.right.type === NodeType.Literal) {
         const l = node.left.value;
@@ -256,8 +259,8 @@ export class Optimizer {
 
     // Binary Expression Constant Folding
     if (node.type === NodeType.BinaryExpression) {
-      node.left = this.visit(node.left, scope, node.type);
-      node.right = this.visit(node.right, scope, node.type);
+      node.left = this.visit(node.left, currentScope, node.type);
+      node.right = this.visit(node.right, currentScope, node.type);
 
       if (node.left.type === NodeType.Literal && node.right.type === NodeType.Literal) {
         const leftVal = node.left.value;
@@ -304,10 +307,10 @@ export class Optimizer {
 
     // Dead Code Elimination on IfStatements
     if (node.type === NodeType.IfStatement) {
-      node.test = this.visit(node.test, scope, node.type);
-      node.consequent = this.visit(node.consequent, scope, node.type);
+      node.test = this.visit(node.test, currentScope, node.type);
+      node.consequent = this.visit(node.consequent, currentScope, node.type);
       if (node.alternate) {
-        node.alternate = this.visit(node.alternate, scope, node.type);
+        node.alternate = this.visit(node.alternate, currentScope, node.type);
       }
 
       if (node.test.type === NodeType.Literal) {

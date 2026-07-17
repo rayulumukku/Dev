@@ -22,7 +22,7 @@ export function hmrPlugin(): RayPlugin {
       // Prepend the HotContext initialization block
       const hotContextInjected = `
 if (!import.meta.hot) {
-  import.meta.hot = window.__ray_create_hot_context(import.meta.url);
+  import.meta.hot = (typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : globalThis).__ray_create_hot_context?.(import.meta.url);
 }
 \n${code}`;
 

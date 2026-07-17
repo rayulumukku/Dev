@@ -9,7 +9,9 @@ export class Scope {
   }
 
   declare(name: string, node: ASTNode) {
-    this.bindings.set(name, { node, referencesCount: 0 });
+    const existing = this.bindings.get(name);
+    const count = existing ? existing.referencesCount : 0;
+    this.bindings.set(name, { node, referencesCount: count });
   }
 
   reference(name: string): boolean {
@@ -41,16 +43,25 @@ export class ScopeAnalyzer {
 
   private visit(node: ASTNode, currentScope: Scope) {
     if (!node) return;
+    (node as any)._scope = currentScope;
 
     if (node.type === NodeType.Program) {
+      // Hoist function declarations in program scope
+      node.body.forEach((child: any) => {
+        if (child && child.type === NodeType.FunctionDeclaration && child.id && child.id.name) {
+          currentScope.declare(child.id.name, child);
+        }
+      });
       node.body.forEach((child: any) => this.visit(child, currentScope));
     } else if (node.type === NodeType.ImportDeclaration) {
       node.specifiers.forEach((spec: any) => {
+        (spec as any)._scope = currentScope;
         const name = spec.local.name;
         currentScope.declare(name, spec);
       });
     } else if (node.type === NodeType.VariableDeclaration || node.type === NodeType.UsingDeclaration) {
       node.declarations.forEach((decl: any) => {
+        (decl as any)._scope = currentScope;
         this.declarePattern(decl.id, currentScope, decl);
         if (decl.init) this.visit(decl.init, currentScope);
       });
@@ -87,6 +98,12 @@ export class ScopeAnalyzer {
       if (node.value) this.visit(node.value, currentScope);
     } else if (node.type === NodeType.BlockStatement) {
       const blockScope = new Scope(currentScope);
+      // Hoist function declarations in block scope
+      node.body.forEach((child: any) => {
+        if (child && child.type === NodeType.FunctionDeclaration && child.id && child.id.name) {
+          blockScope.declare(child.id.name, child);
+        }
+      });
       node.body.forEach((child: any) => this.visit(child, blockScope));
     } else if (node.type === NodeType.IfStatement) {
       this.visit(node.test, currentScope);
@@ -109,6 +126,7 @@ export class ScopeAnalyzer {
     } else if (node.type === NodeType.SwitchStatement) {
       this.visit(node.discriminant, currentScope);
       node.cases.forEach((c: any) => {
+        (c as any)._scope = currentScope;
         if (c.test) this.visit(c.test, currentScope);
         c.consequent.forEach((s: any) => this.visit(s, currentScope));
       });
@@ -157,6 +175,7 @@ export class ScopeAnalyzer {
       (node.elements || []).forEach((e: any) => { if (e) this.visit(e, currentScope); });
     } else if (node.type === NodeType.ObjectExpression || node.type === 'ObjectExpression') {
       (node.properties || []).forEach((p: any) => {
+        (p as any)._scope = currentScope;
         if (p.type === NodeType.SpreadElement) {
           this.visit(p.argument, currentScope);
         } else {
@@ -179,6 +198,7 @@ export class ScopeAnalyzer {
       }
       if (node.specifiers) {
         node.specifiers.forEach((spec: any) => {
+          (spec as any)._scope = currentScope;
           if (spec.local) currentScope.reference(spec.local.name);
         });
       }
@@ -192,6 +212,7 @@ export class ScopeAnalyzer {
    */
   private declarePattern(pattern: ASTNode, scope: Scope, node: ASTNode) {
     if (!pattern) return;
+    (pattern as any)._scope = scope;
 
     if (pattern.type === NodeType.Identifier) {
       scope.declare(pattern.name, node);

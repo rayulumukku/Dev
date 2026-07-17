@@ -453,7 +453,7 @@ export class CodeGenerator {
 
       case NodeType.CallExpression: {
         let callee = this.generate(node.callee);
-        if (node.callee.type === NodeType.FunctionDeclaration || node.callee.type === NodeType.ArrowFunctionExpression) {
+        if ([NodeType.FunctionDeclaration, NodeType.ArrowFunctionExpression, NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.callee.type)) {
           callee = `(${callee})`;
         }
         const args = node.arguments.map((arg: any) => this.generate(arg)).join(`,${s}`);
@@ -461,13 +461,19 @@ export class CodeGenerator {
       }
 
       case NodeType.NewExpression: {
-        const callee = this.generate(node.callee);
+        let callee = this.generate(node.callee);
+        if ([NodeType.FunctionDeclaration, NodeType.ArrowFunctionExpression, NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.callee.type)) {
+          callee = `(${callee})`;
+        }
         const args = node.arguments.map((arg: any) => this.generate(arg)).join(`,${s}`);
         return this.emit(`new${s}${callee}(${args})`);
       }
 
       case NodeType.MemberExpression: {
-        const obj = this.generate(node.object);
+        let obj = this.generate(node.object);
+        if ([NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.object.type)) {
+          obj = `(${obj})`;
+        }
         if (node.computed) {
           const prop = this.generate(node.property);
           return this.emit(`${obj}[${prop}]`);
@@ -477,7 +483,10 @@ export class CodeGenerator {
       }
 
       case NodeType.OptionalMemberExpression: {
-        const obj = this.generate(node.object);
+        let obj = this.generate(node.object);
+        if ([NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.object.type)) {
+          obj = `(${obj})`;
+        }
         if (node.computed) {
           return this.emit(`${obj}?.[${this.generate(node.property)}]`);
         }
@@ -485,7 +494,10 @@ export class CodeGenerator {
       }
 
       case NodeType.OptionalCallExpression: {
-        const callee = this.generate(node.callee);
+        let callee = this.generate(node.callee);
+        if ([NodeType.FunctionDeclaration, NodeType.ArrowFunctionExpression, NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.callee.type)) {
+          callee = `(${callee})`;
+        }
         const args = node.arguments.map((a: any) => this.generate(a)).join(`,${s}`);
         return this.emit(`${callee}?.(${args})`);
       }
