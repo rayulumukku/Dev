@@ -19,12 +19,31 @@ export async function handleModuleRequest(
 
   const specifier = urlPath.slice('/@modules/'.length);
 
-  // Check if this bare specifier was optimized
-  if (ray.optimizerResult && ray.optimizerResult.optimized[specifier]) {
-    const redirectUrl = ray.optimizerResult.optimized[specifier];
-    res.writeHead(302, { 'Location': redirectUrl });
-    res.end();
-    return true;
+  const getPackageName = (spec: string): string => {
+    const parts = spec.split('/');
+    if (spec.startsWith('@')) {
+      return `${parts[0]}/${parts[1]}`;
+    }
+    return parts[0];
+  };
+
+  // Check if this bare specifier (or its resolved file) was optimized
+  if (ray.optimizerResult) {
+    const packageName = getPackageName(specifier);
+    if (ray.optimizerResult.optimized[packageName]) {
+      try {
+        const resolvedPackage = ray.resolve(packageName, ray.projectRoot);
+        const resolvedSpecifier = ray.resolve('/@modules/' + specifier, ray.projectRoot);
+        if (resolvedPackage === resolvedSpecifier) {
+          const redirectUrl = ray.optimizerResult.optimized[packageName];
+          res.writeHead(302, { 'Location': redirectUrl });
+          res.end();
+          return true;
+        }
+      } catch {
+        // Ignore resolution failures
+      }
+    }
   }
 
   try {
@@ -37,7 +56,7 @@ export async function handleModuleRequest(
 
     res.writeHead(200, {
       'Content-Type': 'application/javascript',
-      'Cache-Control': 'max-age=31536000, immutable', // Node modules are immutable in dev
+      'Cache-Control': 'no-cache',
     });
     res.end(code);
     return true;

@@ -351,7 +351,15 @@ export class RayCore {
       external: externals,
     });
     try { fs.unlinkSync(tmpOut); } catch {}
-    return output.code;
+    let rewrittenCode = output.code.replace(
+      /(\b(?:import|export)\s+[\w\s*{},\$]+from\s+['"])([^'"./][^'"]*)(['"])/g,
+      '$1/@modules/$2$3'
+    );
+    rewrittenCode = rewrittenCode.replace(
+      /(\bimport\s+['"])([^'"./][^'"]*)(['"])/g,
+      '$1/@modules/$2$3'
+    );
+    return rewrittenCode;
   }
 
   /**

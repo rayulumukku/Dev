@@ -452,7 +452,10 @@ export class CodeGenerator {
       }
 
       case NodeType.CallExpression: {
-        const callee = this.generate(node.callee);
+        let callee = this.generate(node.callee);
+        if (node.callee.type === NodeType.FunctionDeclaration || node.callee.type === NodeType.ArrowFunctionExpression) {
+          callee = `(${callee})`;
+        }
         const args = node.arguments.map((arg: any) => this.generate(arg)).join(`,${s}`);
         return this.emit(`${callee}(${args})`);
       }
@@ -550,7 +553,7 @@ export class CodeGenerator {
 
       case NodeType.Property: {
         let key = node.computed ? `[${this.generate(node.key)}]` : this.generate(node.key);
-        if (!node.computed && typeof key === 'string' && !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
+        if (!node.computed && node.key.type === NodeType.Identifier && typeof key === 'string' && !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) {
           key = JSON.stringify(key);
         }
 

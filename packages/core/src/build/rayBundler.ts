@@ -5,6 +5,14 @@ import { RayCompiler } from '../compiler/index.js';
 import { Resolver } from '../resolver/index.js';
 import { transformCjsToEsm } from '../compiler/cjsTransform.js';
 
+function normalizePath(p: string): string {
+  let resolved = path.resolve(p);
+  if (process.platform === 'win32' && resolved[1] === ':') {
+    resolved = resolved[0].toLowerCase() + resolved.slice(1);
+  }
+  return resolved.replace(/\\/g, '/');
+}
+
 /**
  * RayBundler
  *
@@ -100,13 +108,14 @@ export class RayBundler {
   }
 
   private async traverse(file: string, external: Set<string>): Promise<void> {
-    if (this.visitedModules.has(file)) return;
+    const normFile = normalizePath(file);
+    if (this.visitedModules.has(normFile)) return;
     // Mark as visiting (cycle guard)
-    this.visitedModules.set(file, '');
+    this.visitedModules.set(normFile, '');
 
     let src = '';
     try {
-      src = fs.readFileSync(file, 'utf-8');
+      src = fs.readFileSync(normFile, 'utf-8');
     } catch {
       return;
     }
@@ -126,7 +135,7 @@ export class RayBundler {
     // Compile through Ray compiler
     let compiled: string;
     try {
-      const result = this.compiler.compile(src, file);
+      const result = this.compiler.compile(src, normFile);
       compiled = result.code;
     } catch {
       compiled = src; // emit raw on compile failure
@@ -136,12 +145,12 @@ export class RayBundler {
     const specifiers = this.extractImports(src);
     for (const spec of specifiers) {
       if (external.has(spec) || external.has(spec.split('/')[0])) continue;
-      const resolved = this.resolveFile(spec, file);
+      const resolved = this.resolveFile(spec, normFile);
       if (resolved) await this.traverse(resolved, external);
     }
 
-    this.visitedModules.set(file, compiled);
-    this.moduleOrder.push(file);
+    this.visitedModules.set(normFile, compiled);
+    this.moduleOrder.push(normFile);
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -188,16 +197,112 @@ export class RayBundler {
     const parts: string[] = [];
     let cssAccumulator = '';
 
-    for (const file of this.moduleOrder) {
-      let code = this.visitedModules.get(file) ?? '';
+    const getFileVarName = (filePath: string): string => {
+      const norm = normalizePath(filePath);
+      let hash = 0;
+      for (let i = 0; i < norm.length; i++) {
+        hash = (hash << 5) - hash + norm.charCodeAt(i);
+        hash |= 0;
+      }
+      return `__bundle_mod_${Math.abs(hash).toString(36)}__`;
+    };
 
-      if (file.endsWith('.css')) {
-        cssAccumulator += `\n/* ${path.basename(file)} */\n${code}`;
+    const normEntry = normalizePath(options.entryPoint);
+
+    for (const file of this.moduleOrder) {
+      const normFile = normalizePath(file);
+      let code = this.visitedModules.get(normFile) ?? '';
+
+      if (normFile.endsWith('.css')) {
+        cssAccumulator += `\n/* ${path.basename(normFile)} */\n${code}`;
         continue;
       }
 
-      code = this.wrapModule(file, code, options.format);
-      parts.push(`/* ${path.relative(path.dirname(options.entryPoint), file)} */\n${code}`);
+      const isEntry = (normFile === normEntry);
+      const varName = getFileVarName(normFile);
+      const dir = path.dirname(normFile);
+
+      // 1. Matches: import x from './y'
+      const relativeImportRegex = /import\s+(\w+)\s+from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
+      code = code.replace(relativeImportRegex, (match, importedName, dotPrefix, relPath) => {
+        let nestedPath = path.resolve(dir, dotPrefix + relPath);
+        if (!path.extname(nestedPath)) {
+          for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
+            if (fs.existsSync(nestedPath + ext)) {
+              nestedPath += ext;
+              break;
+            }
+          }
+        }
+        const normNested = normalizePath(nestedPath);
+        if (this.visitedModules.has(normNested)) {
+          const nestedVar = getFileVarName(normNested);
+          return `const ${importedName} = ${nestedVar};`;
+        }
+        return match;
+      });
+
+      // 2. Matches side-effect: import './y'
+      const relativeSideEffectRegex = /import\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
+      code = code.replace(relativeSideEffectRegex, (match, dotPrefix, relPath) => {
+        let nestedPath = path.resolve(dir, dotPrefix + relPath);
+        if (!path.extname(nestedPath)) {
+          for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
+            if (fs.existsSync(nestedPath + ext)) {
+              nestedPath += ext;
+              break;
+            }
+          }
+        }
+        const normNested = normalizePath(nestedPath);
+        if (this.visitedModules.has(normNested)) {
+          return `/* Inlined: ${path.basename(normNested)} */`;
+        }
+        return match;
+      });
+
+      // Matches: export * from './y'
+      const relativeExportAllRegex = /export\s+\*\s+from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
+      code = code.replace(relativeExportAllRegex, (match, dotPrefix, relPath) => {
+        let nestedPath = path.resolve(dir, dotPrefix + relPath);
+        if (!path.extname(nestedPath)) {
+          for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
+            if (fs.existsSync(nestedPath + ext)) {
+              nestedPath += ext;
+              break;
+            }
+          }
+        }
+        const normNested = normalizePath(nestedPath);
+        if (this.visitedModules.has(normNested)) {
+          const nestedVar = getFileVarName(normNested);
+          const nestedCode = this.visitedModules.get(normNested) ?? '';
+          const names: string[] = [];
+          const exportNameRegex = /\bexport\s+const\s+([a-zA-Z0-9_$]+)\b/g;
+          let m: RegExpExecArray | null;
+          while ((m = exportNameRegex.exec(nestedCode)) !== null) {
+            names.push(m[1]);
+          }
+          if (names.length > 0) {
+            return names.map(name => `export const ${name} = ${nestedVar}.${name};`).join('\n');
+          }
+          return `/* Inlined export * from: ${path.basename(normNested)} */`;
+        }
+        return match;
+      });
+
+      // 3. For nested inlined modules, rewrite "export default" to a local binding assignment
+      // and strip relative exports.
+      if (!isEntry) {
+        code = code.replace(/\bexport default\s+/g, `const ${varName} = `);
+        code = code.replace(/export\s+const\s+[a-zA-Z0-9_$]+\s*=\s*__cjs_module_[a-zA-Z0-9_$]+__\.exports\.[a-zA-Z0-9_$]+;?/g, '');
+        code = code.replace(/\bexport\s+(const|let|var|function|class)\s+/g, '$1 ');
+        code = code.replace(/export\s+\*\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
+        code = code.replace(/export\s+{[^}]+}\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
+      }
+
+      code = this.wrapModule(normFile, code, options.format);
+      parts.push(`/* ${path.relative(path.dirname(normEntry), normFile)} */\n${code}`);
     }
 
     let bundleCode = parts.join('\n\n');

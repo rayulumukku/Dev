@@ -1,79 +1,72 @@
-import { Lexer, Parser, CodeGenerator, ASTVisitor } from './index.js';
-import { NodeType } from './ast.js';
+import { Lexer, Parser, CodeGenerator } from './index.js';
 
 /**
  * Transforms a CommonJS format module string to ESM.
- * Combines AST traversal for standard require/exports with regular expression fallbacks for complex patterns.
+ * Wraps CJS module code inside a function closure (IIFE) to isolate variable scopes
+ * and prevent duplicate declaration errors under ESM.
  */
 export function transformCjsToEsm(code: string): string {
   let transformed = code;
 
-  // 1. Convert require declarations
-  // const x = require('y') -> import x from 'y'
+  // 1. Pre-evaluate process.env.NODE_ENV conditionals for common wrapper patterns (e.g. react/index.js)
+  // Handles both raw process.env.NODE_ENV and pre-substituted literal 'production' / 'development'
   transformed = transformed.replace(
-    /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\);?/g,
-    'import $1 from "$2";'
+    /if\s*\(\s*(?:process\.env\.NODE_ENV|['"](?:production|development)['"])\s*===\s*['"]production['"]\s*\)\s*\{\s*module\.exports\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\);?\s*\}\s*else\s*\{\s*module\.exports\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\);?\s*\}/g,
+    (match, prodTarget, devTarget) => {
+      const isProd = process.env.NODE_ENV === 'production' || match.includes("'production' ===");
+      return isProd ? `module.exports = require("${prodTarget}");` : `module.exports = require("${devTarget}");`;
+    }
   );
 
-  // require('y') -> import 'y'
-  transformed = transformed.replace(
-    /require\(\s*['"]([^'"]+)['"]\s*\);?/g,
-    'import "$1";'
-  );
-
-  // 2. Convert module.exports
-  // module.exports = x -> export default x
-  transformed = transformed.replace(
-    /module\.exports\s*=\s*([a-zA-Z0-9_$]+);?/g,
-    'export default $1;'
-  );
-
-  // module.exports = { a, b } -> export default { a, b }
-  transformed = transformed.replace(
-    /module\.exports\s*=\s*(\{[\s\S]*?\});?/g,
-    'export default $1;'
-  );
-
-  // 3. Convert exports.foo
-  // exports.foo = bar -> export const foo = bar
-  transformed = transformed.replace(
-    /exports\.([a-zA-Z0-9_$]+)\s*=\s*([^;]+);?/g,
-    'export const $1 = $2;'
-  );
-
-  // 4. Try parsing and optimizing using AST visitor if valid JS
-  try {
-    const lexer = new Lexer(transformed);
-    const parser = new Parser(lexer.tokenize());
-    const ast = parser.parse();
-
-    const visitor = new ASTVisitor({
-      ExpressionStatement(node: any) {
-        // Handle assignment to module.exports inside statements
-        if (
-          node.expression &&
-          node.expression.type === 'AssignmentExpression' &&
-          node.expression.left &&
-          node.expression.left.type === 'MemberExpression'
-        ) {
-          const leftStr = `${node.expression.left.object.name || ''}.${node.expression.left.property.name || ''}`;
-          if (leftStr === 'module.exports') {
-            return {
-              type: NodeType.ExportNamedDeclaration,
-              isDefault: true,
-              declaration: node.expression.right
-            };
-          }
-        }
-        return node;
-      }
-    });
-
-    visitor.traverse(ast);
-    transformed = new CodeGenerator().generate(ast);
-  } catch {
-    // If AST parsing fails due to non-standard code (e.g. CJS conditional requires), we use the regex-transformed version as fallback.
+  const delegateMatch = /^(?:'use strict';?\s*)?module\.exports\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\);?\s*$/i.exec(transformed.trim());
+  if (delegateMatch) {
+    const target = delegateMatch[1];
+    return `import __cjs_delegate_default__ from "${target}";\nexport default __cjs_delegate_default__;\nexport * from "${target}";`;
   }
 
-  return transformed;
+  // Generate a unique identifier suffix to avoid clashing inside bundled files
+  const uid = Math.random().toString(36).substring(2, 10);
+
+  // 3. Extract and convert require(...) expressions to top level static imports
+  const imports: string[] = [];
+  let depCount = 0;
+  transformed = transformed.replace(
+    /require\(\s*['"]([^'"]+)['"]\s*\)/g,
+    (match, specifier) => {
+      const depName = `__cjs_dep_${uid}_${depCount++}__`;
+      imports.push(`import ${depName} from "${specifier}";`);
+      return depName;
+    }
+  );
+
+  // 4. Standardize module.exports.foo to exports.foo
+  transformed = transformed.replace(/module\.exports\.([a-zA-Z0-9_$]+)/g, 'exports.$1');
+
+  // 5. Collect all exports.foo properties to generate named exports at the end
+  const exportNames = new Set<string>();
+  const exportRegex = /\bexports\.([a-zA-Z0-9_$]+)\b/g;
+  let match;
+  while ((match = exportRegex.exec(transformed)) !== null) {
+    exportNames.add(match[1]);
+  }
+
+  // 6. Wrap the CJS code inside a function enclosure to prevent identifier collisions
+  let wrapperCode = `
+const __cjs_exports_${uid}__ = {};
+const __cjs_module_${uid}__ = { exports: __cjs_exports_${uid}__ };
+(function(module, exports) {
+${transformed}
+})(__cjs_module_${uid}__, __cjs_exports_${uid}__);
+`;
+
+  // 7. Generate final exports
+  let bottomExports = `\nexport default __cjs_module_${uid}__.exports;\n`;
+  for (const name of exportNames) {
+    bottomExports += `export const ${name} = __cjs_module_${uid}__.exports.${name};\n`;
+  }
+
+  // 8. Combine into a clean ESM module
+  const result = imports.join('\n') + '\n' + wrapperCode + bottomExports;
+
+  return result;
 }

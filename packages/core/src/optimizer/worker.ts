@@ -15,15 +15,23 @@ async function execute() {
   const { resolvedPath, dep, outFilePath, env } = workerData as WorkerPayload;
 
   try {
+    function normalizePath(p: string): string {
+      let resolved = path.resolve(p);
+      if (process.platform === 'win32' && resolved[1] === ':') {
+        resolved = resolved[0].toLowerCase() + resolved.slice(1);
+      }
+      return resolved.replace(/\\/g, '/');
+    }
+
     const visited = new Set<string>();
 
-    function inlineBundle(filePath: string): string {
-      const absPath = path.resolve(filePath);
-      if (visited.has(absPath)) return '';
-      visited.add(absPath);
+    function inlineBundle(filePath: string, depName?: string): string {
+      const normPath = normalizePath(filePath);
+      if (visited.has(normPath)) return '';
+      visited.add(normPath);
 
-      if (!fs.existsSync(absPath)) return '';
-      let fileContent = fs.readFileSync(absPath, 'utf-8');
+      if (!fs.existsSync(normPath)) return '';
+      let fileContent = fs.readFileSync(normPath, 'utf-8');
 
       // 1. Convert CommonJS constructs to ESM if present
       if (fileContent.includes('module.exports') || fileContent.includes('exports.') || fileContent.includes('require(')) {
@@ -31,11 +39,11 @@ async function execute() {
       }
 
       // 2. Scan and recursively inline relative imports within the package
-      const dir = path.dirname(absPath);
-      // Matches both static: import x from './y' and side-effect: import './y'
-      const relativeImportRegex = /import\s+[^'"]*from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
+      const dir = path.dirname(normPath);
+      // Matches: import x from './y'
+      const relativeImportRegex = /import\s+(\w+)\s+from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
       
-      fileContent = fileContent.replace(relativeImportRegex, (match, dotPrefix, relPath) => {
+      fileContent = fileContent.replace(relativeImportRegex, (match, importedName, dotPrefix, relPath) => {
         let nestedPath = path.resolve(dir, dotPrefix + relPath);
         if (!path.extname(nestedPath)) {
           for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
@@ -45,7 +53,7 @@ async function execute() {
             }
           }
         }
-        return inlineBundle(nestedPath);
+        return inlineBundle(nestedPath, importedName);
       });
 
       // Inline side-effect imports as well
@@ -62,6 +70,52 @@ async function execute() {
         }
         return inlineBundle(nestedPath);
       });
+
+      // Matches: export * from './y'
+      const relativeExportAllRegex = /export\s+\*\s+from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
+      fileContent = fileContent.replace(relativeExportAllRegex, (match, dotPrefix, relPath) => {
+        let nestedPath = path.resolve(dir, dotPrefix + relPath);
+        if (!path.extname(nestedPath)) {
+          for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
+            if (fs.existsSync(nestedPath + ext)) {
+              nestedPath += ext;
+              break;
+            }
+          }
+        }
+        const normNested = normalizePath(nestedPath);
+        if (visited.has(normNested)) {
+          let nestedContent = fs.readFileSync(normNested, 'utf-8');
+          if (nestedContent.includes('module.exports') || nestedContent.includes('exports.') || nestedContent.includes('require(')) {
+            nestedContent = transformCjsToEsm(nestedContent);
+          }
+          const names: string[] = [];
+          const exportNameRegex = /\bexport\s+const\s+([a-zA-Z0-9_$]+)\b/g;
+          let m: RegExpExecArray | null;
+          while ((m = exportNameRegex.exec(nestedContent)) !== null) {
+            names.push(m[1]);
+          }
+          if (names.length > 0) {
+            const importMatch = new RegExp(`import\\s+(\\w+)\\s+from\\s+['"](?:\\.\\/|\\.\\.\\/)${relPath.replace(/\./g, '\\.')}['"]`).exec(fileContent);
+            const nestedVar = importMatch ? importMatch[1] : `__dep_${Math.random().toString(36).substring(2, 8)}__`;
+            return names.map(name => `export const ${name} = ${nestedVar}.${name};`).join('\n');
+          }
+          return `/* Inlined export * from: ${path.basename(normNested)} */`;
+        }
+        return match;
+      });
+
+      // 3. For nested inlined modules, rewrite "export default" to a local binding assignment
+      // and strip relative exports.
+      if (depName) {
+        fileContent = fileContent.replace(/\bexport default\s+/g, `const ${depName} = `);
+        fileContent = fileContent.replace(/export\s+const\s+[a-zA-Z0-9_$]+\s*=\s*__cjs_module_[a-zA-Z0-9_$]+__\.exports\.[a-zA-Z0-9_$]+;?/g, '');
+        fileContent = fileContent.replace(/\bexport\s+(const|let|var|function|class)\s+/g, '$1 ');
+      }
+
+      // Strip relative re-exports (their contents are already inlined or handled by local bindings)
+      fileContent = fileContent.replace(/export\s+\*\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
+      fileContent = fileContent.replace(/export\s+{[^}]+}\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
 
       return fileContent;
     }
@@ -90,14 +144,21 @@ async function execute() {
       const { code: minifiedCode } = codegen.generateWithSourceMap(optimizedAst, resolvedPath);
       bundledCode = minifiedCode;
     } catch {
-      // Fallback: simple whitespace/newline minification if advanced parser optimization fails
-      bundledCode = bundledCode
-        .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1') // remove comments
-        .replace(/\s+/g, ' ')
-        .trim();
+      // Fallback: keep the bundled code as-is if advanced parser optimization fails
+      // to ensure perfect correctness and syntax validity.
     }
 
-    // 4. Ensure parent directories exist and write output file
+    // 4. Rewrite bare package imports/re-exports (e.g. from 'react') to '/@modules/react'
+    bundledCode = bundledCode.replace(
+      /(\b(?:import|export)\s+[\w\s*{},\$]+from\s+['"])([^'"./][^'"]*)(['"])/g,
+      '$1/@modules/$2$3'
+    );
+    bundledCode = bundledCode.replace(
+      /(\bimport\s+['"])([^'"./][^'"]*)(['"])/g,
+      '$1/@modules/$2$3'
+    );
+
+    // 5. Ensure parent directories exist and write output file
     fs.mkdirSync(path.dirname(outFilePath), { recursive: true });
     fs.writeFileSync(outFilePath, bundledCode, 'utf-8');
 
