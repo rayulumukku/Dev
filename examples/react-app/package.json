@@ -1,0 +1,19 @@
+{
+  "name": "examples/react-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ray dev",
+    "build": "ray build",
+    "preview": "ray preview",
+    "verify": "ray verify"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@ray/cli": "*",
+    "typescript": "^5.3.3"
+  }
+}
