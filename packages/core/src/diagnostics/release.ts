@@ -16,6 +16,103 @@ export async function runRelease(projectRoot: string, options: ReleaseOptions) {
     console.log(`⚠️  [Dry Run Mode] No files will be modified on disk or committed.`);
   }
 
+  // 1.0.1 API Compatibility Check
+  console.log(`\n🔒 [Ray Release] Verifying API backward compatibility...`);
+  const coreExports = await import('../index.js');
+  const REQUIRED_EXPORTS = [
+    'Resolver',
+    'DependencyGraph',
+    'ModuleNode',
+    'buildProject',
+    'PluginContainer',
+    'runOptimizer',
+    'react',
+    'svg',
+    'mdx',
+    'wasm',
+    'json',
+    'copy',
+    'vue',
+    'solid',
+    'svelte',
+    'tailwind',
+    'eslint',
+    'pwa',
+    'image',
+    'runDoctor',
+    'displayStats',
+    'runBenchmark',
+    'runRelease',
+    'runVerify',
+    'studio',
+    'CompilerCacheStore',
+    'BuildScheduler',
+    'RayCompiler',
+    'RayCore'
+  ];
+  for (const exp of REQUIRED_EXPORTS) {
+    if ((coreExports as any)[exp] === undefined) {
+      throw new Error(`[Ray Release API Compatibility Check Failed] Missing required public export symbol: "${exp}"`);
+    }
+  }
+  console.log(`✨ [Ray Release] API backward compatibility verified. All ${REQUIRED_EXPORTS.length} public symbols are intact.`);
+
+  // 1.0.2 Memory Leak Diagnostics
+  console.log(`\n🧠 [Ray Release] Running memory leak diagnostics...`);
+  const initialHeap = process.memoryUsage().heapUsed;
+  const { RayCore } = await import('../index.js');
+  const coreInstance = new RayCore(projectRoot);
+  await coreInstance.init();
+  for (let i = 0; i < 50; i++) {
+    await coreInstance.transform("const a = 1;", "dummy.js");
+  }
+  const finalHeap = process.memoryUsage().heapUsed;
+  const heapDeltaMB = (finalHeap - initialHeap) / (1024 * 1024);
+  console.log(`  > Memory leak test heap delta: ${heapDeltaMB.toFixed(2)} MB`);
+  if (heapDeltaMB > 25) {
+    throw new Error(`[Ray Release Memory Leak Check Failed] Potential memory leak detected. Heap grew by ${heapDeltaMB.toFixed(2)} MB during compile loop.`);
+  }
+  console.log(`✨ [Ray Release] Memory usage is stable.`);
+
+  // 1.0.3 Build Snapshot Validation
+  console.log(`\n📸 [Ray Release] Running production build snapshot validation...`);
+  const demoDir = path.join(projectRoot, 'demo');
+  if (fs.existsSync(demoDir)) {
+    const { buildProject } = await import('../build/index.js');
+    await buildProject({
+      outDir: path.join(demoDir, 'dist'),
+      minify: true,
+      sourcemap: false,
+      watch: false,
+      analyze: false,
+      mode: 'production'
+    });
+    const buildIndexHtml = path.join(demoDir, 'dist/index.html');
+    if (!fs.existsSync(buildIndexHtml)) {
+      throw new Error(`[Ray Release Snapshot Check Failed] Production HTML bundle index.html was not generated.`);
+    }
+    console.log(`✨ [Ray Release] Build snapshot validated successfully.`);
+  }
+
+  // 1.0.4 CI Regression Tests Triggers
+  if (process.env.VITEST !== 'true' && !process.env.RAY_RELEASE_SKIP_CI) {
+    console.log(`\n✅ [Ray Release] Executing unit and integration regression test suite (Vitest)...`);
+    try {
+      execSync('npx vitest run', { cwd: projectRoot, stdio: 'inherit' });
+      console.log(`✨ [Ray Release] Regression unit and integration tests passed.`);
+    } catch (err: any) {
+      throw new Error(`[Ray Release Regression Check Failed] Unit or integration tests failed: ${err.message}`);
+    }
+
+    console.log(`\n✅ [Ray Release] Executing E2E browser regression test suite (Playwright)...`);
+    try {
+      execSync('npx playwright test', { cwd: projectRoot, stdio: 'inherit' });
+      console.log(`✨ [Ray Release] E2E browser integration tests passed.`);
+    } catch (err: any) {
+      throw new Error(`[Ray Release Regression Check Failed] E2E browser integration tests failed: ${err.message}`);
+    }
+  }
+
   // 1.1 Performance Verification Check
   if (!options.skipPerf) {
     console.log(`\n⏱️  [Ray Release] Measuring release performance metrics...`);
