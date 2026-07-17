@@ -26,15 +26,21 @@ export function parseSpecifier(specifier: string): { packageName: string; subpat
 /**
  * Resolves conditional exports based on client ESM preferences.
  */
-export function resolveConditionalExports(exportsValue: any): string | null {
+export function resolveConditionalExports(exportsValue: any, importType?: string): string | null {
   if (typeof exportsValue === 'string') {
     return exportsValue;
   }
   if (typeof exportsValue === 'object' && exportsValue !== null) {
-    const conditions = ['import', 'module', 'browser', 'default', 'require'];
+    // Import attributes influence condition ordering:
+    // with { type: 'json' } → prefer 'json' condition
+    // with { type: 'css' } → prefer 'css' condition
+    const conditions = [
+      ...(importType ? [importType] : []),
+      'import', 'module', 'browser', 'default', 'require'
+    ];
     for (const cond of conditions) {
       if (cond in exportsValue) {
-        const val = resolveConditionalExports(exportsValue[cond]);
+        const val = resolveConditionalExports(exportsValue[cond], importType);
         if (val) return val;
       }
     }
@@ -54,11 +60,22 @@ export class Resolver {
   /**
    * Resolves a bare package specifier (e.g. 'react', 'react-dom/client') to its absolute file path.
    * Uses standard Node-style node_modules lookup starting from the importer directory.
+   * If specifier starts with '#', resolves via the `imports` field in the nearest package.json.
    */
-  resolveBarePackage(specifier: string, startDir: string): string {
-    const cacheKey = `${specifier}::${startDir}`;
+  resolveBarePackage(specifier: string, startDir: string, importType?: string): string {
+    const cacheKey = `${specifier}::${startDir}::${importType || ''}`;
     if (this.resolutionCache.has(cacheKey)) {
       return this.resolutionCache.get(cacheKey)!;
+    }
+
+    // Package self-references via 'imports' field: #internal/foo
+    if (specifier.startsWith('#')) {
+      const resolved = this.resolveSubpathImport(specifier, startDir, importType);
+      if (resolved) {
+        this.resolutionCache.set(cacheKey, resolved);
+        return resolved;
+      }
+      throw new Error(`Cannot resolve subpath import "${specifier}" from "${startDir}"`);
     }
 
     const { packageName, subpath } = parseSpecifier(specifier);
@@ -149,6 +166,58 @@ export class Resolver {
   }
 
   /**
+   * Resolves '#subpath' imports using the `imports` field from the nearest package.json.
+   * Per Node.js subpath imports specification.
+   */
+  private resolveSubpathImport(specifier: string, startDir: string, importType?: string): string | null {
+    let dir = startDir;
+    while (true) {
+      const pkgPath = path.join(dir, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        try {
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+          if (pkg.imports && typeof pkg.imports === 'object') {
+            const importsMap = pkg.imports;
+            // Direct match
+            if (specifier in importsMap) {
+              const resolved = resolveConditionalExports(importsMap[specifier], importType);
+              if (resolved) {
+                return this.ensureFile(path.resolve(dir, resolved));
+              }
+            }
+            // Wildcard match: #internal/* → ./src/internal/*
+            for (const key of Object.keys(importsMap)) {
+              if (key.includes('*')) {
+                const [prefix, suffix] = key.split('*');
+                if (specifier.startsWith(prefix) && specifier.endsWith(suffix || '')) {
+                  const match = specifier.slice(prefix.length, suffix ? specifier.length - suffix.length : undefined);
+                  const target = importsMap[key];
+                  let resolvedTarget: string | null;
+                  if (typeof target === 'string') {
+                    resolvedTarget = target.replace('*', match);
+                  } else {
+                    resolvedTarget = resolveConditionalExports(target, importType);
+                    if (resolvedTarget) resolvedTarget = resolvedTarget.replace('*', match);
+                  }
+                  if (resolvedTarget) {
+                    return this.ensureFile(path.resolve(dir, resolvedTarget));
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          // Malformed package.json — skip
+        }
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return null;
+  }
+
+  /**
    * Resolves extension-less paths or directories containing index files.
    */
   private ensureFile(filePath: string): string {
@@ -156,7 +225,7 @@ export class Resolver {
       return filePath;
     }
 
-    const extensions = ['.js', '.mjs', '.jsx', '.ts', '.tsx', '.json'];
+    const extensions = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.mts', '.cts', '.d.ts', '.json'];
     for (const ext of extensions) {
       const candidate = filePath + ext;
       if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {

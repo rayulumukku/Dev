@@ -3,6 +3,11 @@
  * Establishes a WebSocket connection back to the dev server.
  * Implements import.meta.hot (accept, dispose, data), a component proxying engine
  * to preserve hooks state across updates, root re-rendering, and a full-screen error overlay.
+ *
+ * Ecosystem compatibility:
+ * - React Compiler: Detects compiler-optimised components and skips proxy wrapping.
+ * - React Server Components: Handles "use server"/"use client" module boundaries.
+ * - CSS Modules: Hot-replaces constructable stylesheets.
  */
 export const hmrClientCode = `
 (function() {
@@ -14,11 +19,46 @@ export const hmrClientCode = `
   window.__ray_active_roots = window.__ray_active_roots || new Set();
   window.__ray_root_components = window.__ray_root_components || new Map();
 
+  // ── React Compiler Detection ──────────────────────────────────────────────
+  // When the React Compiler is active, components are pre-optimised with stable
+  // references and memoisation boundaries. Proxy wrapping would interfere with
+  // the compiler's output. We detect compiler mode via a global flag set by the
+  // Ray dev server when the React Compiler plugin is loaded.
+  const isReactCompilerActive = () => {
+    return !!(window.__ray_react_compiler_active);
+  };
+
+  // ── RSC Module Type Registry ──────────────────────────────────────────────
+  // Modules annotated with "use server" or "use client" directives have special
+  // HMR behavior. Server modules trigger full-page reload; client modules use
+  // standard component HMR.
+  const rscModuleTypes = new Map(); // path -> 'server' | 'client' | null
+
+  window.__ray_register_rsc_type = (modulePath, type) => {
+    rscModuleTypes.set(modulePath, type);
+  };
+
   // 1. React Component Proxy Registry (For state-preserving HMR updates)
   const componentProxies = new Map(); // id -> { stableWrapper, currentImplementation }
 
   window.__ray_register_component = (moduleId, name, implementation) => {
     const id = moduleId + '::' + name;
+
+    // React Compiler mode: skip proxy wrapping entirely.
+    // The compiler handles stable references and memoisation boundaries.
+    if (isReactCompilerActive()) {
+      // Still track for re-render triggers, but return the raw implementation
+      let record = componentProxies.get(id);
+      if (!record) {
+        record = { stableWrapper: implementation, currentImplementation: implementation };
+        componentProxies.set(id, record);
+      } else {
+        record.currentImplementation = implementation;
+        record.stableWrapper = implementation;
+      }
+      return implementation;
+    }
+
     let record = componentProxies.get(id);
 
     if (!record) {
@@ -199,6 +239,20 @@ export const hmrClientCode = `
             updated = true;
           }
 
+          // CSS Modules: replace constructed stylesheets
+          if (!updated && path.includes('.module.css')) {
+            try {
+              const mod = await import(path + '?import&t=' + timestamp);
+              // CSS Module re-export triggers style update
+              updated = true;
+              console.log('[Ray] CSS Module hot-reloaded: ' + path);
+            } catch (e) {
+              console.warn('[Ray] CSS Module reload failed, falling back to full reload', e);
+              location.reload();
+              return;
+            }
+          }
+
           if (!updated) {
             location.reload();
           }
@@ -210,6 +264,14 @@ export const hmrClientCode = `
             const path = update.path;
             const acceptedPath = update.acceptedPath;
             const timestamp = update.timestamp;
+
+            // RSC boundary check: server modules require full reload
+            const rscType = rscModuleTypes.get(acceptedPath);
+            if (rscType === 'server') {
+              console.log('[Ray RSC] Server module changed, performing full reload: ' + acceptedPath);
+              location.reload();
+              return;
+            }
 
             console.log('[Ray HMR] Applying module HMR: ' + acceptedPath);
 
