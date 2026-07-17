@@ -227,3 +227,176 @@ export async function runBenchmark(projectRoot: string, options: BenchmarkOption
   fs.writeFileSync(htmlPath, htmlContent);
   console.log(`[Ray Benchmark] HTML report written to: ${htmlPath}`);
 }
+
+export interface PerformanceMetrics {
+  coldStart: number;      // ms
+  warmStart: number;      // ms
+  hmrLatency: number;     // ms
+  buildSpeed: number;     // ms
+  memory: number;         // MB
+  cpu: number;            // ms
+  pluginExecution: number;// ms
+  cacheHitRatio: number;  // %
+}
+
+/**
+ * Dynamically measures the 8 performance metrics of the compiler in the target project.
+ */
+export async function measurePerformance(projectRoot: string): Promise<PerformanceMetrics> {
+  const { RayCore } = await import('../index.js');
+
+  // Find/create entry file for test compilation
+  const entryPath = path.resolve(projectRoot, 'src/main.jsx');
+  let testCode = "import React from 'react'; export default function App() { return <div>Ray</div>; }";
+  if (fs.existsSync(entryPath)) {
+    testCode = fs.readFileSync(entryPath, 'utf-8');
+  }
+
+  // Record CPU start
+  const startCpu = process.cpuUsage();
+
+  // 1. Cold Start
+  const cacheDir = path.join(projectRoot, '.ray/cache');
+  if (fs.existsSync(cacheDir)) {
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
+  const startCold = performance.now();
+  const coreCold = new RayCore(projectRoot, 'production');
+  await coreCold.init();
+  await coreCold.transform(testCode, entryPath);
+  const coldStart = performance.now() - startCold;
+
+  // 2. Warm Start
+  const startWarm = performance.now();
+  const coreWarm = new RayCore(projectRoot, 'production');
+  await coreWarm.init();
+  await coreWarm.transform(testCode, entryPath);
+  const warmStart = performance.now() - startWarm;
+
+  // 3. HMR Latency
+  const startHMR = performance.now();
+  coreWarm.invalidate(entryPath);
+  await coreWarm.transform(testCode, entryPath);
+  const hmrLatency = performance.now() - startHMR;
+
+  // 4. Build Speed
+  const startBuild = performance.now();
+  await buildProject({
+    outDir: 'dist',
+    minify: true,
+    sourcemap: false,
+    watch: false,
+    analyze: false,
+  });
+  const buildSpeed = performance.now() - startBuild;
+
+  // 5. Memory Usage
+  const memory = process.memoryUsage().heapUsed / (1024 * 1024);
+
+  // 6. CPU Time
+  const cpuUsage = process.cpuUsage(startCpu);
+  const cpu = (cpuUsage.user + cpuUsage.system) / 1000;
+
+  // 7. Plugin Execution
+  let pluginExecution = 0;
+  if (coreWarm.container && coreWarm.container.metrics) {
+    for (const time of coreWarm.container.metrics.values()) {
+      pluginExecution += time;
+    }
+  }
+
+  // 8. Cache Hit Ratio
+  const cacheHitRatio = coreWarm.cacheStore.getDiagnostics().hitRate;
+
+  return {
+    coldStart,
+    warmStart,
+    hmrLatency,
+    buildSpeed,
+    memory,
+    cpu,
+    pluginExecution,
+    cacheHitRatio
+  };
+}
+
+/**
+ * Compares current performance metrics against baseline, enforcing at least one
+ * improvement and no regressions.
+ */
+export function comparePerformance(baseline: PerformanceMetrics, current: PerformanceMetrics): {
+  passed: boolean;
+  improved: boolean;
+  regressed: boolean;
+  report: string;
+  improvedMetrics: string[];
+  regressedMetrics: string[];
+} {
+  let improvedCount = 0;
+  let regressedCount = 0;
+  const improvedMetrics: string[] = [];
+  const regressedMetrics: string[] = [];
+  const details: string[] = [];
+
+  const checkLowerIsBetter = (
+    name: string,
+    base: number,
+    curr: number,
+    unit: string,
+    absThreshold: number
+  ) => {
+    const diff = curr - base;
+    const pct = base > 0 ? (diff / base) * 100 : 0;
+
+    let status = 'Stable';
+    if (curr < base * 0.98 && -diff > absThreshold) {
+      status = 'Improved';
+      improvedCount++;
+      improvedMetrics.push(name);
+    } else if (curr > base * 1.05 && diff > absThreshold) {
+      status = 'REGRESSION';
+      regressedCount++;
+      regressedMetrics.push(name);
+    }
+    details.push(`${name.padEnd(16)} | ${base.toFixed(1)}${unit}`.padEnd(25) + `| ${curr.toFixed(1)}${unit}`.padEnd(15) + `| ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}${unit} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)`.padEnd(30) + `| ${status}`);
+  };
+
+  const checkHigherIsBetter = (
+    name: string,
+    base: number,
+    curr: number,
+    unit: string
+  ) => {
+    const diff = curr - base;
+    let status = 'Stable';
+    if (curr > base + 1.0) {
+      status = 'Improved';
+      improvedCount++;
+      improvedMetrics.push(name);
+    } else if (curr < base - 1.0) {
+      status = 'REGRESSION';
+      regressedCount++;
+      regressedMetrics.push(name);
+    }
+    details.push(`${name.padEnd(16)} | ${base.toFixed(1)}${unit}`.padEnd(25) + `| ${curr.toFixed(1)}${unit}`.padEnd(15) + `| ${diff >= 0 ? '+' : ''}${diff.toFixed(1)}${unit}`.padEnd(30) + `| ${status}`);
+  };
+
+  details.push(`Metric           | Baseline                | Current        | Change                         | Status`);
+  details.push(`-----------------------------------------------------------------------------------------------------`);
+  checkLowerIsBetter('Cold Start', baseline.coldStart, current.coldStart, 'ms', 15);
+  checkLowerIsBetter('Warm Start', baseline.warmStart, current.warmStart, 'ms', 5);
+  checkLowerIsBetter('HMR Latency', baseline.hmrLatency, current.hmrLatency, 'ms', 5);
+  checkLowerIsBetter('Build Speed', baseline.buildSpeed, current.buildSpeed, 'ms', 20);
+  checkLowerIsBetter('Memory Usage', baseline.memory, current.memory, 'MB', 2);
+  checkLowerIsBetter('CPU Time', baseline.cpu, current.cpu, 'ms', 20);
+  checkLowerIsBetter('Plugin Exec', baseline.pluginExecution, current.pluginExecution, 'ms', 5);
+  checkHigherIsBetter('Cache Hit Ratio', baseline.cacheHitRatio, current.cacheHitRatio, '%');
+
+  const report = details.join('\n');
+  const regressed = regressedCount > 0;
+  const improved = improvedCount > 0;
+  const passed = !regressed && improved;
+
+  return { passed, improved, regressed, report, improvedMetrics, regressedMetrics };
+}
+

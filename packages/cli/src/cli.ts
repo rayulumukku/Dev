@@ -379,8 +379,9 @@ export default defineConfig({
       const versionIdx = args.indexOf('--version');
       const version = versionIdx !== -1 && args[versionIdx + 1] ? args[versionIdx + 1] : 'patch';
       const dryRun = args.includes('--dry-run');
+      const skipPerf = args.includes('--skip-perf') || args.includes('--force');
 
-      runRelease(process.cwd(), { version, dryRun });
+      await runRelease(process.cwd(), { version, dryRun, skipPerf });
       process.exit(0);
     } catch (err: any) {
       console.error('Release command failed:', err.message);

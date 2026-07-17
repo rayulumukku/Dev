@@ -2266,8 +2266,8 @@ export class Parser {
       if (v === '>' && depth > 0) { depth--; this.advance(); continue; }
       if (depth > 0) { this.advance(); continue; }
       // Stop at tokens that indicate end of type annotation
-      if (v === '=' || v === ',' || v === ')' || v === ';' || v === '{' || v === '}' || v === '=>' || v === '|' && depth === 0) {
-        // Handle union types: keep consuming if |
+      if ((v === '=' || v === ',' || v === ')' || v === ';' || v === '{' || v === '}' || v === '=>' || v === '|' || v === '&') && depth === 0) {
+        // Handle union / intersection types: keep consuming if | or &
         if (v === '|' || v === '&') {
           this.advance();
           continue;

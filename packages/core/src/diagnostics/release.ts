@@ -5,14 +5,75 @@ import { execSync } from 'child_process';
 interface ReleaseOptions {
   version: string; // 'patch', 'minor', 'major', or exact version string
   dryRun?: boolean;
+  skipPerf?: boolean;
 }
 
-export function runRelease(projectRoot: string, options: ReleaseOptions) {
+export async function runRelease(projectRoot: string, options: ReleaseOptions) {
   console.log(`\n🚀 [Ray Release] Starting v1.0 Release Pipeline...`);
   const dryRun = !!options.dryRun;
 
   if (dryRun) {
     console.log(`⚠️  [Dry Run Mode] No files will be modified on disk or committed.`);
+  }
+
+  // 1.1 Performance Verification Check
+  if (!options.skipPerf) {
+    console.log(`\n⏱️  [Ray Release] Measuring release performance metrics...`);
+    const { measurePerformance, comparePerformance } = await import('../benchmark/index.js');
+    const currentMetrics = await measurePerformance(projectRoot);
+
+    const baselinePath = path.join(projectRoot, 'performance-baseline.json');
+    let baseline: any = null;
+
+    if (fs.existsSync(baselinePath)) {
+      try {
+        baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8'));
+      } catch (err: any) {
+        console.warn(`⚠️  Failed to parse performance-baseline.json: ${err.message}`);
+      }
+    }
+
+    if (!baseline) {
+      // Try fallback to last tag via git checkout
+      try {
+        const lastTag = execSync('git describe --tags --abbrev=0', { cwd: projectRoot, encoding: 'utf-8' }).trim();
+        if (lastTag) {
+          console.log(`⏱️  Previous tag "${lastTag}" found. Checking out temporarily to establish performance baseline...`);
+          execSync('git stash', { cwd: projectRoot });
+          execSync(`git checkout ${lastTag}`, { cwd: projectRoot });
+          try {
+            baseline = await measurePerformance(projectRoot);
+          } finally {
+            execSync('git checkout -', { cwd: projectRoot });
+            try {
+              execSync('git stash pop', { cwd: projectRoot });
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+
+    if (baseline) {
+      console.log(`\n📊 [Ray Release] Comparing current performance against baseline...`);
+      const comparison = comparePerformance(baseline, currentMetrics);
+      console.log(comparison.report);
+
+      if (comparison.regressed) {
+        throw new Error(`[Ray Release Performance Check Failed] Blocked due to performance regressions: ${comparison.regressedMetrics.join(', ')}`);
+      }
+      if (!comparison.improved) {
+        throw new Error(`[Ray Release Performance Check Failed] Blocked: Every release must improve at least one performance metric. No improvements detected.`);
+      }
+
+      console.log(`\n✨ [Ray Release] Performance check passed! Current release is faster / more efficient.`);
+    } else {
+      console.log(`⚠️  [Ray Release] No previous performance baseline found. Initial baseline will be saved.`);
+    }
+
+    if (!dryRun) {
+      fs.writeFileSync(baselinePath, JSON.stringify(currentMetrics, null, 2) + '\n');
+      console.log(`📝 Saved updated performance baseline to: ${baselinePath}`);
+    }
   }
 
   // 1. Resolve current & target versions

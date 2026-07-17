@@ -53,8 +53,8 @@ describe('Diagnostics & Automation Unit Tests', () => {
   });
 
   describe('runRelease', () => {
-    it('should calculate SemVer bumps correctly in dryRun mode', () => {
-      expect(() => runRelease(projectRoot, { version: 'minor', dryRun: true })).not.toThrow();
+    it('should calculate SemVer bumps correctly in dryRun mode', async () => {
+      await expect(runRelease(projectRoot, { version: 'minor', dryRun: true, skipPerf: true })).resolves.not.toThrow();
     });
   });
 });
