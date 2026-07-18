@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300">
+    <rect width="100%" height="100%" fill="#09090b"/>
+    <text x="400" y="30" font-family="'Inter', sans-serif" font-size="18" fill="#f4f4f5" font-weight="bold" text-anchor="middle">Ray Plugin Lifecycle Hooks</text>
+    <rect x="100" y="70" width="600" height="180" rx="10" fill="#18181b" stroke="#27272a" stroke-width="2"/>
+    <text x="400" y="110" font-family="monospace" font-size="14" fill="#a1a1aa" text-anchor="middle">configResolved() → buildStart()</text>
+    <text x="400" y="150" font-family="monospace" font-size="14" fill="#6366f1" text-anchor="middle">resolveId() → load() → transform()</text>
+    <text x="400" y="190" font-family="monospace" font-size="14" fill="#a1a1aa" text-anchor="middle">buildEnd()</text>
+  </svg>

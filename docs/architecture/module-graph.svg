@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400">
+    <rect width="100%" height="100%" fill="#09090b"/>
+    <defs>
+      <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6366f1"/>
+        <stop offset="100%" stop-color="#3b82f6"/>
+      </linearGradient>
+    </defs>
+    <rect x="50" y="50" width="700" height="300" rx="15" fill="#18181b" stroke="#27272a" stroke-width="2"/>
+    <text x="400" y="35" font-family="'Inter', sans-serif" font-size="20" fill="#f4f4f5" font-weight="bold" text-anchor="middle">Ray Module Graph</text>
+    
+    <!-- Nodes -->
+    <rect x="300" y="80" width="200" height="50" rx="8" fill="url(#g1)"/>
+    <text x="400" y="110" font-family="monospace" font-size="14" fill="#ffffff" text-anchor="middle" font-weight="bold">src/main.jsx</text>
+    
+    <rect x="150" y="200" width="180" height="50" rx="8" fill="#27272a" stroke="#6366f1" stroke-width="2"/>
+    <text x="240" y="230" font-family="monospace" font-size="13" fill="#f4f4f5" text-anchor="middle">src/App.jsx</text>
+    
+    <rect x="470" y="200" width="180" height="50" rx="8" fill="#27272a" stroke="#3b82f6" stroke-width="2"/>
+    <text x="560" y="230" font-family="monospace" font-size="13" fill="#f4f4f5" text-anchor="middle">src/tailwind.css</text>
+    
+    <!-- Arrows -->
+    <path d="M 400 130 L 240 200" stroke="#a1a1aa" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M 400 130 L 560 200" stroke="#a1a1aa" stroke-width="2"/>
+  </svg>

@@ -11,6 +11,8 @@ describe('Performance Enforcer', () => {
     cpu: 150,            // ms
     pluginExecution: 12, // ms
     cacheHitRatio: 90,   // %
+    bundleSize: 10000,   // bytes
+    dependencyOptimizationTime: 50, // ms
   };
 
   it('should pass if there is an improvement and no regression', () => {
