@@ -71,15 +71,19 @@ describe('Migrate Configuration Detection & Loading Layer Tests', () => {
   it('should load TS configuration file with type annotations and interface definitions', async () => {
     const configPath = path.join(testDir, 'vite.config.ts');
     const tsCode = `
+      const PORT_VAL = 8080;
+      const MODE_VAL = 'development';
       interface UserConfig {
         base: string;
         port: number;
+        mode: string;
       }
       type ModeAlias = string;
 
       const config: UserConfig = {
         base: '/app/',
-        port: 8080 as number
+        port: PORT_VAL as number,
+        mode: MODE_VAL
       };
       export default config;
     `;
@@ -88,6 +92,7 @@ describe('Migrate Configuration Detection & Loading Layer Tests', () => {
     const config = await loadConfig(configPath);
     expect(config.base).toBe('/app/');
     expect(config.port).toBe(8080);
+    expect(config.mode).toBe('development');
   });
 
   it('should load ESM configuration file (.mjs)', async () => {

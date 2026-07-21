@@ -82,9 +82,11 @@ function stripTypeScript(src: string): string {
   // Remove `type Alias = ...;` declarations
   src = src.replace(/^type\s+\w[\w\d]*\s*=\s*[^;]+;/gm, '');
 
-  // Remove `: TypeAnnotation` from function params and variable declarations
-  // Match `: SomeType` that is followed by = , ) ; { whitespace
-  src = src.replace(/:\s*[A-Z][A-Za-z0-9<>,\s\[\]|&\?\.]*(?=[=,\)\s;{])/g, '');
+  // Remove `: TypeAnnotation` from variable declarations (const/let/var x: Type = ...)
+  src = src.replace(/\b(const|let|var)\s+(\w+)\s*:\s*[A-Za-z0-9_<>,\s\[\]|&\?\.]*(?=\s*=|\s*;)/g, '$1 $2');
+
+  // Remove `: TypeAnnotation` from function parameters using a safe whitelist of types
+  src = src.replace(/:\s*(?:ConfigEnv|UserConfig|RayConfig|any|string|number|boolean|object|void|unknown|never|Record|Array)\b/g, '');
 
   // Remove `as Type` casts (but not `async`)
   src = src.replace(/\bas\s+[A-Z]\w*/g, '');

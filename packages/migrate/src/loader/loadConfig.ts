@@ -19,8 +19,11 @@ function normalizeSourceCode(src: string, isTs: boolean): string {
     // 3. Remove `type Alias = ...;` declarations
     code = code.replace(/\btype\s+\w[\w\d]*\s*=\s*[^;]+;/g, '');
 
-    // 4. Remove `: TypeAnnotation` (e.g., : string, : any, : number, : UserConfig, : Record<string, any>)
-    code = code.replace(/:\s*(?:any|string|number|boolean|object|void|unknown|never|Record|Array|[A-Z]\w*)[A-Za-z0-9_<>,\s\[\]|&\?\.]*(?=[=,\)\s;{])/g, '');
+    // 4a. Remove `: TypeAnnotation` from variable declarations (const/let/var x: Type = ...)
+    code = code.replace(/\b(const|let|var)\s+(\w+)\s*:\s*[A-Za-z0-9_<>,\s\[\]|&\?\.]*(?=\s*=|\s*;)/g, '$1 $2');
+
+    // 4b. Remove `: TypeAnnotation` from function parameters using a safe whitelist of types
+    code = code.replace(/:\s*(?:ConfigEnv|UserConfig|RayConfig|any|string|number|boolean|object|void|unknown|never|Record|Array)\b/g, '');
 
     // 5. Remove `as Type` casts (e.g., as number, as any, as UserConfig)
     code = code.replace(/\bas\s+(?:any|string|number|boolean|object|[A-Z]\w*)/g, '');
