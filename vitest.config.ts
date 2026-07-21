@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@ray/migrate': path.resolve(__dirname, './packages/migrate/src/index.ts'),
+      '@ray/plugin-compat': path.resolve(__dirname, './packages/plugin-compat/src/index.ts'),
       '@ray/core': path.resolve(__dirname, './packages/core/src/index.ts'),
       '@ray/dev-server': path.resolve(__dirname, './packages/dev-server/src/index.ts'),
       '@ray/transform': path.resolve(__dirname, './packages/transform/src/index.ts'),

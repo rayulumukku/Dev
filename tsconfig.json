@@ -8,6 +8,7 @@
     { "path": "./packages/dev-server" },
     { "path": "./packages/hmr-runtime" },
     { "path": "./packages/migrate" },
+    { "path": "./packages/plugin-compat" },
     { "path": "./packages/cli" }
   ]
 }

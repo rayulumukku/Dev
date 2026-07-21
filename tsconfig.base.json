@@ -14,6 +14,7 @@
     "baseUrl": ".",
     "paths": {
       "@ray/migrate": ["./packages/migrate/src/index.ts"],
+      "@ray/plugin-compat": ["./packages/plugin-compat/src/index.ts"],
       "@ray/core": ["./packages/core/src/index.ts"],
       "@ray/dev-server": ["./packages/dev-server/src/index.ts"],
       "@ray/transform": ["./packages/transform/src/index.ts"],
