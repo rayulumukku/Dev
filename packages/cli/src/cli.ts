@@ -4,6 +4,7 @@ import { exec } from 'child_process';
 import { startDevServer } from '@ray/dev-server';
 import { buildProject } from '@ray/core';
 import { runCreateProject } from './create.js';
+import { runMigrateCommand } from './commands/migrate.js';
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -620,6 +621,9 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'migrate') {
+  const result = runMigrateCommand({ cwd: process.cwd() });
+  process.exit(result.exitCode);
 } else {
   console.log(`
  ⚡ Ray CLI (Milestone 18 - Ray Cloud Distributed Compiler Platform) ⚡
@@ -635,6 +639,7 @@ Usage:
   ray build --remote  Execute parallel compilation distributed across cloud workers
   ray preview         Serve static production build from dist/
   ray create <name>   Scaffold a new project (templates: react, react-ts, react-ssr, library)
+  ray migrate         Detect and migrate Vite or Webpack projects to Ray
   ray verify          Perform full project diagnostic checks
   ray release         Publish automation pipeline (bumping version, changelog, tagging)
   ray cache info      Display compiler cache usage details
