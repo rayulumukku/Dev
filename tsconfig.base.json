@@ -10,6 +10,15 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "composite": true
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ray/migrate": ["./packages/migrate/src/index.ts"],
+      "@ray/core": ["./packages/core/src/index.ts"],
+      "@ray/dev-server": ["./packages/dev-server/src/index.ts"],
+      "@ray/transform": ["./packages/transform/src/index.ts"],
+      "@ray/hmr-runtime": ["./packages/hmr-runtime/src/index.ts"],
+      "@ray/compiler-rust": ["./packages/compiler-rust/src/index.ts"]
+    }
   }
 }

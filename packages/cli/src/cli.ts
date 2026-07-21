@@ -622,8 +622,10 @@ export default defineConfig({
     }
   })();
 } else if (command === 'migrate') {
-  const result = runMigrateCommand({ cwd: process.cwd() });
-  process.exit(result.exitCode);
+  (async () => {
+    const result = await runMigrateCommand({ cwd: process.cwd() });
+    process.exit(result.exitCode);
+  })();
 } else {
   console.log(`
  ⚡ Ray CLI (Milestone 18 - Ray Cloud Distributed Compiler Platform) ⚡

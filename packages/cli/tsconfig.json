@@ -7,6 +7,7 @@
   "include": ["src/**/*"],
   "references": [
     { "path": "../dev-server" },
-    { "path": "../core" }
+    { "path": "../core" },
+    { "path": "../migrate" }
   ]
 }

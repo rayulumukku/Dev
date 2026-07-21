@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ray/dev-server": "*",
-    "@ray/core": "*"
+    "@ray/core": "*",
+    "@ray/migrate": "*"
   }
 }

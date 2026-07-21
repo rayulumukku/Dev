@@ -1,4 +1,5 @@
-import { detectConfig, ConfigDetectionResult } from '../migration/detector.js';
+import path from 'path';
+import { detectConfig, loadConfig, LoadConfigResult } from '@ray/migrate';
 
 export interface MigrateCommandOptions {
   cwd?: string;
@@ -7,27 +8,60 @@ export interface MigrateCommandOptions {
 
 export interface MigrateCommandResult {
   exitCode: number;
-  detection: ConfigDetectionResult;
+  data?: LoadConfigResult;
+  error?: Error;
 }
 
 /**
  * CLI command handler for `ray migrate`.
- * Detects existing Vite or Webpack configurations in the target directory and prints a clean report.
+ * Uses @ray/migrate package to detect and load Vite or Webpack configuration files safely.
  */
-export function runMigrateCommand(options: MigrateCommandOptions = {}): MigrateCommandResult {
-  const cwd = options.cwd || process.cwd();
-  const detection = detectConfig(cwd);
+export async function runMigrateCommand(options: MigrateCommandOptions = {}): Promise<MigrateCommandResult> {
+  const cwd = path.resolve(options.cwd || process.cwd());
 
-  if (!options.silent) {
-    if (detection.found) {
-      console.log(`✓ Project Root: ${detection.rootDir}`);
-      console.log(`✓ Detected: ${detection.framework}`);
-      console.log(`✓ Config: ${detection.configFile}`);
-    } else {
-      console.log(`✗ No supported configuration found.`);
+  try {
+    const detected = detectConfig(cwd);
+
+    if (!detected) {
+      if (!options.silent) {
+        console.log(`✗ Failed to load configuration`);
+        console.log(`Reason: No supported configuration file found.`);
+      }
+      return {
+        exitCode: 1,
+        error: new Error(`No supported configuration file found.`),
+      };
     }
-  }
 
-  const exitCode = detection.found ? 0 : 1;
-  return { exitCode, detection };
+    const frameworkName = detected.type === 'vite' ? 'Vite' : 'Webpack';
+
+    if (!options.silent) {
+      console.log(`✓ Project Root: ${cwd}`);
+      console.log(`✓ Framework Detected: ${frameworkName}`);
+    }
+
+    const loadedConfig = await loadConfig(detected.path);
+
+    if (!options.silent) {
+      console.log(`✓ Config Loaded Successfully`);
+    }
+
+    return {
+      exitCode: 0,
+      data: {
+        config: loadedConfig,
+        framework: detected.type,
+        configPath: detected.path,
+      },
+    };
+  } catch (err: any) {
+    if (!options.silent) {
+      console.log(`✗ Failed to load configuration`);
+      console.log(`Reason: ${err.message || String(err)}`);
+    }
+    return {
+      exitCode: 1,
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
 }
