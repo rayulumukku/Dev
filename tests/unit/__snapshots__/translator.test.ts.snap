@@ -1,0 +1,263 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate alias-heavy Vite config correctly 1`] = `
+{
+  "resolve": {
+    "alias": {
+      "@assets": "./src/assets",
+      "@components": "./src/components",
+      "@hooks": "./src/hooks",
+      "@utils": "./src/utils",
+    },
+  },
+}
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate alias-heavy Vite config correctly 2`] = `
+"import { defineConfig } from '@ray/core';
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "@components": "./src/components",
+      "@hooks": "./src/hooks",
+      "@utils": "./src/utils",
+      "@assets": "./src/assets"
+    }
+  }
+});
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate alias-heavy Vite config correctly 3`] = `
+"# Ray Migration Report
+
+- **Detected Framework**: Vite
+- **Status**: Completed with 0 ignored fields
+
+## Successfully Migrated
+
+The following fields were successfully mapped to Ray equivalents:
+- \`resolve.alias\`
+
+## Ignored Fields
+
+No fields were ignored.
+
+## Manual Review Required
+
+The following items require manual review:
+- **Plugins**: Any custom plugins configured in the Vite configuration must be manually translated or replaced by equivalent Ray plugins.
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate build-heavy Vite config correctly 1`] = `
+{
+  "build": {
+    "assetsDir": "static-assets",
+    "minify": false,
+    "outDir": "build-output",
+    "sourcemap": true,
+  },
+  "define": {
+    "__VERSION__": ""1.2.3"",
+  },
+  "envPrefix": "VITE_",
+}
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate build-heavy Vite config correctly 2`] = `
+"import { defineConfig } from '@ray/core';
+
+export default defineConfig({
+  build: {
+    outDir: "build-output",
+    assetsDir: "static-assets",
+    sourcemap: true,
+    minify: false
+  },
+  define: {
+    __VERSION__: "\\"1.2.3\\""
+  },
+  envPrefix: "VITE_"
+});
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate build-heavy Vite config correctly 3`] = `
+"# Ray Migration Report
+
+- **Detected Framework**: Vite
+- **Status**: Completed with 2 ignored fields
+
+## Successfully Migrated
+
+The following fields were successfully mapped to Ray equivalents:
+- \`build.outDir\`
+- \`build.assetsDir\`
+- \`build.sourcemap\`
+- \`build.minify\`
+- \`define\`
+- \`envPrefix\`
+
+## Ignored Fields
+
+The following Vite-specific fields are currently unsupported by Ray and were skipped:
+- \`build.target\`
+- \`build.cssMinify\`
+
+## Manual Review Required
+
+The following items require manual review:
+- **Plugins**: Any custom plugins configured in the Vite configuration must be manually translated or replaced by equivalent Ray plugins.
+- **Ignored Settings**: Please ensure that the skipped settings (listed above) are not critical for your application runtime.
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate empty config correctly 1`] = `{}`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate empty config correctly 2`] = `
+"import { defineConfig } from '@ray/core';
+
+export default defineConfig({});
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate empty config correctly 3`] = `
+"# Ray Migration Report
+
+- **Detected Framework**: Vite
+- **Status**: Completed with 0 ignored fields
+
+## Successfully Migrated
+
+No configuration fields were migrated.
+
+## Ignored Fields
+
+No fields were ignored.
+
+## Manual Review Required
+
+The following items require manual review:
+- **Plugins**: Any custom plugins configured in the Vite configuration must be manually translated or replaced by equivalent Ray plugins.
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate medium Vite config with resolver and server correctly 1`] = `
+{
+  "base": "/",
+  "resolve": {
+    "alias": {
+      "@": "./src",
+    },
+  },
+  "root": ".",
+  "server": {
+    "host": "0.0.0.0",
+    "open": true,
+    "port": 8080,
+  },
+}
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate medium Vite config with resolver and server correctly 2`] = `
+"import { defineConfig } from '@ray/core';
+
+export default defineConfig({
+  root: ".",
+  base: "/",
+  server: {
+    host: "0.0.0.0",
+    port: 8080,
+    open: true
+  },
+  resolve: {
+    alias: {
+      "@": "./src"
+    }
+  }
+});
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate medium Vite config with resolver and server correctly 3`] = `
+"# Ray Migration Report
+
+- **Detected Framework**: Vite
+- **Status**: Completed with 3 ignored fields
+
+## Successfully Migrated
+
+The following fields were successfully mapped to Ray equivalents:
+- \`root\`
+- \`base\`
+- \`server.host\`
+- \`server.port\`
+- \`server.open\`
+- \`resolve.alias\`
+
+## Ignored Fields
+
+The following Vite-specific fields are currently unsupported by Ray and were skipped:
+- \`server.proxy\`
+- \`resolve.dedupe\`
+- \`optimizeDeps\`
+
+## Manual Review Required
+
+The following items require manual review:
+- **Plugins**: Any custom plugins configured in the Vite configuration must be manually translated or replaced by equivalent Ray plugins.
+- **Ignored Settings**: Please ensure that the skipped settings (listed above) are not critical for your application runtime.
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate small Vite config correctly 1`] = `
+{
+  "base": "/app/",
+  "plugins": [
+    {
+      "name": "vite-plugin-react",
+    },
+  ],
+  "publicDir": "public",
+  "root": "./src",
+}
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate small Vite config correctly 2`] = `
+"import { defineConfig } from '@ray/core';
+
+export default defineConfig({
+  root: "./src",
+  base: "/app/",
+  publicDir: "public",
+  plugins: []
+});
+"
+`;
+
+exports[`Vite to Ray Configuration Translator Snapshot Tests > should translate small Vite config correctly 3`] = `
+"# Ray Migration Report
+
+- **Detected Framework**: Vite
+- **Status**: Completed with 0 ignored fields
+
+## Successfully Migrated
+
+The following fields were successfully mapped to Ray equivalents:
+- \`root\`
+- \`base\`
+- \`publicDir\`
+- \`plugins\`
+
+## Ignored Fields
+
+No fields were ignored.
+
+## Manual Review Required
+
+The following items require manual review:
+- **Plugins**: Any custom plugins configured in the Vite configuration must be manually translated or replaced by equivalent Ray plugins.
+"
+`;

@@ -1,5 +1,13 @@
 import path from 'path';
-import { detectConfig, loadConfig, LoadConfigResult } from '@ray/migrate';
+import fs from 'fs';
+import {
+  detectConfig,
+  loadConfig,
+  translateViteConfig,
+  generateRayConfigString,
+  generateMigrationReport,
+  LoadConfigResult
+} from '@ray/migrate';
 
 export interface MigrateCommandOptions {
   cwd?: string;
@@ -44,6 +52,33 @@ export async function runMigrateCommand(options: MigrateCommandOptions = {}): Pr
 
     if (!options.silent) {
       console.log(`✓ Config Loaded Successfully`);
+    }
+
+    let rayConfigString = '';
+    let reportString = '';
+
+    if (detected.type === 'vite') {
+      const { rayConfig, ignoredFields, supportedFields } = translateViteConfig(loadedConfig);
+      rayConfigString = generateRayConfigString(rayConfig);
+      reportString = generateMigrationReport('Vite', supportedFields, ignoredFields);
+    } else {
+      // Webpack not implemented yet
+      reportString = generateMigrationReport('Webpack', [], Object.keys(loadedConfig));
+    }
+
+    // Write outputs to cwd
+    const configOutPath = path.join(cwd, 'ray.config.js');
+    const reportOutPath = path.join(cwd, 'ray-migration-report.md');
+
+    if (rayConfigString) {
+      fs.writeFileSync(configOutPath, rayConfigString, 'utf-8');
+      if (!options.silent) {
+        console.log(`✓ Created: ray.config.js`);
+      }
+    }
+    fs.writeFileSync(reportOutPath, reportString, 'utf-8');
+    if (!options.silent) {
+      console.log(`✓ Created: ray-migration-report.md`);
     }
 
     return {
