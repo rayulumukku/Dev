@@ -415,13 +415,13 @@ export class RayCore {
       }
     );
 
-    // Rewrite bare package imports (e.g. 'react') to node_modules absolute paths
+    // Rewrite bare package imports (e.g. 'react') to node_modules absolute paths as file:// URLs
     src = src.replace(
       /from\s+['"]([^'"./][^'"]*)['"]/g,
       (_match: string, spec: string) => {
         try {
           const resolved = this.resolver.resolveBarePackage(spec, fileDir);
-          return `from ${JSON.stringify(resolved)}`;
+          return `from ${JSON.stringify(pathToFileURL(resolved).toString())}`;
         } catch {
           return _match; // leave as-is if cannot resolve
         }
