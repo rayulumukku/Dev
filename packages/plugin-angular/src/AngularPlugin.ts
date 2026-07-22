@@ -1,8 +1,30 @@
 import { AngularPluginOptions } from './types.js';
 import { AngularCompiler } from './AngularCompiler.js';
+import { defineFramework } from '@ray/framework-runtime';
 import path from 'path';
 
 export function angularPlugin(options: AngularPluginOptions = {}): any {
+  defineFramework({
+    name: '@ray/plugin-angular',
+    version: '1.0.0',
+    capabilities: {
+      devRuntime: true,
+      hmr: true,
+      ssr: true,
+      ssg: true,
+      hydration: true,
+      cssProcessing: true,
+      diagnostics: true,
+    },
+    hooks: {
+      transform: (code, id) => {
+        if (!id.endsWith('.ts') && !id.endsWith('.html')) return null;
+        const res = AngularCompiler.compile(code, id, options);
+        return { code: res.code };
+      },
+    },
+  });
+
   return {
     name: '@ray/plugin-angular',
     version: '1.0.0',
@@ -26,7 +48,7 @@ export function angularPlugin(options: AngularPluginOptions = {}): any {
         if (cached) return cached;
       }
 
-      const isServer = options.isServer || this.buildMode === 'production' && options.aot;
+      const isServer = options.isServer || (this.buildMode === 'production' && options.aot);
       const result = AngularCompiler.compile(code, id, { ...options, isServer });
 
       if (this.graph && typeof this.graph.addDependency === 'function') {

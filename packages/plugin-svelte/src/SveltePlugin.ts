@@ -1,7 +1,29 @@
 import { SveltePluginOptions } from './types.js';
 import { SvelteCompiler } from './SvelteCompiler.js';
+import { defineFramework } from '@ray/framework-runtime';
 
 export function sveltePlugin(options: SveltePluginOptions = {}): any {
+  defineFramework({
+    name: '@ray/plugin-svelte',
+    version: '1.0.0',
+    capabilities: {
+      devRuntime: true,
+      hmr: true,
+      ssr: true,
+      ssg: true,
+      hydration: true,
+      cssProcessing: true,
+      diagnostics: true,
+    },
+    hooks: {
+      transform: (code, id) => {
+        if (!id.endsWith('.svelte')) return null;
+        const res = SvelteCompiler.compile(code, id, options);
+        return { code: res.js.code };
+      },
+    },
+  });
+
   return {
     name: '@ray/plugin-svelte',
     version: '1.0.0',
@@ -19,7 +41,7 @@ export function sveltePlugin(options: SveltePluginOptions = {}): any {
         if (cached) return cached;
       }
 
-      const isServer = options.isServer || this.buildMode === 'production' && options.compilerOptions?.generate === 'server';
+      const isServer = options.isServer || (this.buildMode === 'production' && options.compilerOptions?.generate === 'server');
       const result = SvelteCompiler.compile(code, id, { ...options, isServer });
 
       if (this.graph && typeof this.graph.addDependency === 'function') {

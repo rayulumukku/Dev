@@ -1,0 +1,1 @@
+{"version":3,"file":"FrameworkAdapter.js","sourceRoot":"","sources":["FrameworkAdapter.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,eAAe,EAAE,MAAM,sBAAsB,CAAC;AAEvD,MAAM,UAAU,eAAe,CAAC,MAAwB;IACtD,eAAe,CAAC,eAAe,CAAC,MAAM,CAAC,CAAC;IACxC,OAAO,MAAM,CAAC;AAChB,CAAC"}

@@ -1,8 +1,29 @@
 import { SolidPluginOptions } from './types.js';
 import { SolidCompiler } from './SolidCompiler.js';
+import { defineFramework } from '@ray/framework-runtime';
 import path from 'path';
 
 export function solidPlugin(options: SolidPluginOptions = {}): any {
+  defineFramework({
+    name: '@ray/plugin-solid',
+    version: '1.0.0',
+    capabilities: {
+      devRuntime: true,
+      hmr: true,
+      ssr: true,
+      ssg: true,
+      hydration: true,
+      cssProcessing: true,
+    },
+    hooks: {
+      transform: (code, id) => {
+        if (!id.endsWith('.solid.tsx') && !id.endsWith('.jsx') && !id.endsWith('.tsx')) return null;
+        const res = SolidCompiler.compile(code, id, options);
+        return { code: res.code };
+      },
+    },
+  });
+
   return {
     name: '@ray/plugin-solid',
     version: '1.0.0',

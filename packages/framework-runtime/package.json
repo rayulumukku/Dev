@@ -1,0 +1,18 @@
+{
+  "name": "@ray/framework-runtime",
+  "version": "1.0.0",
+  "description": "Framework runtime abstraction layer for Ray enabling framework-independent HMR, SSR, hydration, and capability negotiation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

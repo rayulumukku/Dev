@@ -24,6 +24,7 @@ export default defineConfig({
       '@ray/plugin-angular': path.resolve(__dirname, './packages/plugin-angular/src/index.ts'),
       '@ray/react-server': path.resolve(__dirname, './packages/react-server/src/index.ts'),
       '@ray/server-actions': path.resolve(__dirname, './packages/server-actions/src/index.ts'),
+      '@ray/framework-runtime': path.resolve(__dirname, './packages/framework-runtime/src/index.ts'),
     },
   },
   test: {

@@ -13,6 +13,7 @@
     { "path": "../plugin-solid" },
     { "path": "../plugin-angular" },
     { "path": "../react-server" },
-    { "path": "../server-actions" }
+    { "path": "../server-actions" },
+    { "path": "../framework-runtime" }
   ]
 }
