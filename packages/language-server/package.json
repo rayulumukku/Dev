@@ -1,0 +1,21 @@
+{
+  "name": "@ray/language-server",
+  "version": "1.0.0",
+  "description": "Official Ray Language Server Protocol (LSP) implementation",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/plugin-sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

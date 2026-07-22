@@ -26,7 +26,8 @@
       "@ray/plugin-sdk": ["./packages/plugin-sdk/src/index.ts"],
       "create-ray-plugin": ["./packages/create-ray-plugin/src/cli.ts"],
       "@ray/plugin-registry": ["./packages/plugin-registry/src/index.ts"],
-      "@ray/plugin-manager": ["./packages/plugin-manager/src/index.ts"]
+      "@ray/plugin-manager": ["./packages/plugin-manager/src/index.ts"],
+      "@ray/language-server": ["./packages/language-server/src/index.ts"]
     }
   }
 }
