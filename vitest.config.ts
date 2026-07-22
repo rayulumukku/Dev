@@ -25,6 +25,7 @@ export default defineConfig({
       '@ray/react-server': path.resolve(__dirname, './packages/react-server/src/index.ts'),
       '@ray/server-actions': path.resolve(__dirname, './packages/server-actions/src/index.ts'),
       '@ray/framework-runtime': path.resolve(__dirname, './packages/framework-runtime/src/index.ts'),
+      '@ray/project-graph': path.resolve(__dirname, './packages/project-graph/src/index.ts'),
     },
   },
   test: {

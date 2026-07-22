@@ -33,7 +33,8 @@
       "@ray/plugin-angular": ["./packages/plugin-angular/src/index.ts"],
       "@ray/react-server": ["./packages/react-server/src/index.ts"],
       "@ray/server-actions": ["./packages/server-actions/src/index.ts"],
-      "@ray/framework-runtime": ["./packages/framework-runtime/src/index.ts"]
+      "@ray/framework-runtime": ["./packages/framework-runtime/src/index.ts"],
+      "@ray/project-graph": ["./packages/project-graph/src/index.ts"]
     }
   }
 }

@@ -1,3 +1,3 @@
-export function Button(): string {
-  return '<button>Monorepo Shared Button</button>';
+export function Button({ label }: { label: string }) {
+  return `<button class="ui-button">${label}</button>`;
 }

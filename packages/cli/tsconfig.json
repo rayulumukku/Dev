@@ -12,6 +12,7 @@
     { "path": "../plugin-analyzer" },
     { "path": "../plugin-sdk" },
     { "path": "../plugin-registry" },
-    { "path": "../plugin-manager" }
+    { "path": "../plugin-manager" },
+    { "path": "../project-graph" }
   ]
 }

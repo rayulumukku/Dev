@@ -1,8 +1,8 @@
 {
-  "name": "@monorepo/web",
+  "name": "@example/web",
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@monorepo/ui": "workspace:*"
+    "@example/ui": "1.0.0"
   }
 }

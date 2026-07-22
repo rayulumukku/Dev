@@ -1,0 +1,18 @@
+{
+  "name": "@ray/project-graph",
+  "version": "1.0.0",
+  "description": "Workspace-wide project graph and task orchestration engine for Ray",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

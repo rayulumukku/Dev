@@ -778,6 +778,66 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'graph') {
+  (async () => {
+    try {
+      const { ProjectScanner, ProjectGraph, TaskManifest } = await import('@ray/project-graph');
+      const projects = ProjectScanner.scanWorkspace(process.cwd());
+      const graph = new ProjectGraph(projects);
+      console.log(`\n📊 Ray Project Graph (${projects.length} projects):\n`);
+      for (const p of projects) {
+        console.log(`  📦 ${p.name} [${p.type}] -> Deps: [${graph.getDependencies(p.name).join(', ')}]`);
+      }
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Graph command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'affected') {
+  (async () => {
+    try {
+      const { ProjectScanner, ProjectGraph, AffectedProjects } = await import('@ray/project-graph');
+      const projects = ProjectScanner.scanWorkspace(process.cwd());
+      const graph = new ProjectGraph(projects);
+
+      const changedFilesIdx = args.indexOf('--files');
+      const changedFiles = changedFilesIdx !== -1 && args[changedFilesIdx + 1] ? args[changedFilesIdx + 1].split(',') : ['src/index.ts'];
+
+      const affected = AffectedProjects.getAffectedProjects(graph, changedFiles);
+      console.log(`\n🎯 Affected Projects (${affected.length}):\n  - ${affected.join('\n  - ')}\n`);
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Affected command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'task' || command === 'run') {
+  (async () => {
+    try {
+      const { ProjectScanner, ProjectGraph, TaskScheduler, TaskRunner, ExecutionPlan } = await import('@ray/project-graph');
+      const projects = ProjectScanner.scanWorkspace(process.cwd());
+      const graph = new ProjectGraph(projects);
+
+      let targetProject: string | undefined;
+      let taskName = args[1] || 'build';
+
+      if (command === 'run' && args[1] && args[1].includes(':')) {
+        const parts = args[1].split(':');
+        targetProject = parts[0];
+        taskName = parts[1];
+      }
+
+      const schedule = TaskScheduler.createSchedule(graph, taskName, targetProject);
+      const result = await TaskRunner.runTasks(schedule);
+
+      console.log('\n' + ExecutionPlan.formatReport(result) + '\n');
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Task execution failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'migrate') {
   (async () => {
     const result = await runMigrateCommand({ cwd: process.cwd() });

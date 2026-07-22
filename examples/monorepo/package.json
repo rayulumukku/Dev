@@ -1,8 +1,19 @@
 {
   "name": "example-monorepo",
+  "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "graph": "ray graph",
+    "affected": "ray affected",
+    "build:web": "ray run web:build",
+    "test:ui": "ray run ui:test"
+  },
+  "devDependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/project-graph": "^1.0.0"
+  }
 }
