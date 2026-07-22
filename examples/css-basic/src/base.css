@@ -1,0 +1,9 @@
+@import "./theme.css";
+
+body {
+  margin: 0;
+  padding: 2rem;
+  font-family: system-ui, sans-serif;
+  background-color: var(--bg-color, #fafafa);
+  color: var(--text-color, #111);
+}

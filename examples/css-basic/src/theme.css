@@ -1,0 +1,9 @@
+:root {
+  --bg-color: #0f172a;
+  --text-color: #f8fafc;
+  --primary-color: #38bdf8;
+}
+
+.title {
+  color: var(--primary-color);
+}

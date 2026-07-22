@@ -1,0 +1,18 @@
+{
+  "name": "@ray/plugin-css",
+  "version": "1.0.0",
+  "description": "Plugin-based CSS Pipeline for Ray",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/core": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
