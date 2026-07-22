@@ -18,6 +18,7 @@
     { "path": "../project-graph" },
     { "path": "../test-adapter" },
     { "path": "../test-runner" },
-    { "path": "../observability" }
+    { "path": "../observability" },
+    { "path": "../inspector" }
   ]
 }

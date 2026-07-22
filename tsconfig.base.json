@@ -37,7 +37,8 @@
       "@ray/project-graph": ["./packages/project-graph/src/index.ts"],
       "@ray/test-adapter": ["./packages/test-adapter/src/index.ts"],
       "@ray/test-runner": ["./packages/test-runner/src/index.ts"],
-      "@ray/observability": ["./packages/observability/src/index.ts"]
+      "@ray/observability": ["./packages/observability/src/index.ts"],
+      "@ray/inspector": ["./packages/inspector/src/index.ts"]
     }
   }
 }

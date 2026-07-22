@@ -1,0 +1,20 @@
+{
+  "name": "@ray/inspector",
+  "version": "1.0.0",
+  "description": "Ray Developer Inspector and Debug Console for live module graph, plugin execution, cache activity, and task monitoring",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/observability": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

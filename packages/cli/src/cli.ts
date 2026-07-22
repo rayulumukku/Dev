@@ -379,6 +379,31 @@ if (command === 'dev') {
 } else if (command === 'inspect') {
   (async () => {
     try {
+      const open = args.includes('--open');
+      const portIdx = args.indexOf('--port');
+      const port = portIdx !== -1 && args[portIdx + 1] ? parseInt(args[portIdx + 1], 10) : 4050;
+      const hostIdx = args.indexOf('--host');
+      const host = hostIdx !== -1 && args[hostIdx + 1] ? args[hostIdx + 1] : '127.0.0.1';
+
+      if (open || args.includes('--port') || args.includes('--host') || args.length === 1) {
+        const { InspectorServer } = await import('@ray/inspector');
+        const inspector = new InspectorServer({ port, host, open });
+        const res = await inspector.start();
+
+        if (open) {
+          try {
+            if (process.platform === 'win32') {
+              exec(`start "" "${res.url}"`);
+            } else if (process.platform === 'darwin') {
+              exec(`open "${res.url}"`);
+            } else {
+              exec(`xdg-open "${res.url}"`);
+            }
+          } catch {}
+        }
+        return;
+      }
+
       const { RayCore } = await import('@ray/core');
       const core = new RayCore(process.cwd());
       await core.init();

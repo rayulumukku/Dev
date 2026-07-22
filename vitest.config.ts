@@ -29,6 +29,7 @@ export default defineConfig({
       '@ray/test-adapter': path.resolve(__dirname, './packages/test-adapter/src/index.ts'),
       '@ray/test-runner': path.resolve(__dirname, './packages/test-runner/src/index.ts'),
       '@ray/observability': path.resolve(__dirname, './packages/observability/src/index.ts'),
+      '@ray/inspector': path.resolve(__dirname, './packages/inspector/src/index.ts'),
     },
   },
   test: {

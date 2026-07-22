@@ -14,6 +14,7 @@
     { "path": "./packages/test-adapter" },
     { "path": "./packages/test-runner" },
     { "path": "./packages/observability" },
+    { "path": "./packages/inspector" },
     { "path": "./packages/plugin-svelte" },
     { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-angular" },

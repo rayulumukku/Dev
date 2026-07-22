@@ -8,16 +8,20 @@ const testTmpDir = path.resolve(process.cwd(), 'temp-project-generator-test');
 
 describe('Deterministic Synthetic Project Generator (PR-18)', () => {
   beforeEach(() => {
-    if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
-    }
+    try {
+      if (fs.existsSync(testTmpDir)) {
+        fs.rmSync(testTmpDir, { recursive: true, force: true });
+      }
+    } catch {}
     fs.mkdirSync(testTmpDir, { recursive: true });
   });
 
   afterEach(() => {
-    if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
-    }
+    try {
+      if (fs.existsSync(testTmpDir)) {
+        fs.rmSync(testTmpDir, { recursive: true, force: true });
+      }
+    } catch {}
   });
 
   it('should generate deterministic PRNG numbers given the same seed', () => {
