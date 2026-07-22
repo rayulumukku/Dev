@@ -336,3 +336,13 @@ export const hmrClientCode = `
   connect();
 })();
 `;
+
+export * from './overlay/types.js';
+export * from './overlay/ErrorParser.js';
+export * from './overlay/SourceMapResolver.js';
+export * from './overlay/CodeFrame.js';
+export * from './overlay/StackTrace.js';
+export * from './overlay/Diagnostics.js';
+export * from './overlay/Recovery.js';
+export * from './overlay/OverlayUI.js';
+export * from './overlay/ErrorOverlay.js';
