@@ -1,0 +1,11 @@
+@use "./variables";
+
+.card {
+  background-color: $bg-color;
+  padding: 2rem;
+  border-radius: 8px;
+
+  .card-title {
+    color: $primary-color;
+  }
+}

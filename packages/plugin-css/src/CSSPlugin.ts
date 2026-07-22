@@ -2,6 +2,7 @@ import { RayPlugin } from '@ray/core';
 import { CSSPluginOptions } from './types.js';
 import { processCSS } from './CSSPipeline.js';
 import { processCSSModule } from './modules/CSSModules.js';
+import { compileSass } from './sass/SassCompiler.js';
 import { generateCSSHMR } from './HMR.js';
 import { globalCSSCache } from './CSSCache.js';
 
@@ -10,33 +11,40 @@ export function cssPlugin(options: CSSPluginOptions = {}): RayPlugin {
     name: '@ray/plugin-css',
 
     resolveId(id: string) {
-      if (id.endsWith('.css')) return id;
+      if (/\.(css|scss|sass)(\?.*)?$/.test(id)) return id;
       return null;
     },
 
     transform(code: string, id: string, context?: any) {
-      if (!id.endsWith('.css')) return null;
+      if (!/\.(css|scss|sass)(\?.*)?$/.test(id)) return null;
 
       const isProduction = context?.isProduction ?? false;
+      let rawCSS = code;
 
-      // Handle CSS Modules (*.module.css)
-      if (id.endsWith('.module.css')) {
-        const { jsCode } = processCSSModule(code, id, isProduction);
+      // 1. Compile SCSS / Sass if applicable
+      if (id.endsWith('.scss') || id.endsWith('.sass')) {
+        const compiledSass = compileSass(code, id);
+        rawCSS = compiledSass.css;
+      }
+
+      // 2. Handle CSS Modules (*.module.css / *.module.scss / *.module.sass)
+      if (id.includes('.module.')) {
+        const { jsCode } = processCSSModule(rawCSS, id, isProduction);
         const hmrCode = generateCSSHMR(id);
         return {
           code: `${jsCode}\n${hmrCode}`,
         };
       }
 
-      // Handle regular CSS files (.css)
-      const { jsCode, imports } = processCSS(code, id);
+      // 3. Handle regular CSS / compiled SCSS
+      const { jsCode, imports } = processCSS(rawCSS, id);
 
       globalCSSCache.set(id, {
         filename: id,
-        code,
+        code: rawCSS,
         imports,
         mtime: Date.now(),
-        hash: String(code.length),
+        hash: String(rawCSS.length),
       });
 
       const hmrCode = generateCSSHMR(id);
