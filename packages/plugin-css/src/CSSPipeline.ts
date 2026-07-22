@@ -1,9 +1,13 @@
 import { globalCSSModuleGraph } from './CSSModuleGraph.js';
 import { processPostCSS } from './postcss/PostCSSPipeline.js';
+import { processTailwind } from './tailwind/TailwindPipeline.js';
 
 export function processCSS(code: string, filename: string, rootDir?: string): { code: string; jsCode: string; imports: string[] } {
-  // Execute PostCSS pipeline if config is present
-  const { code: postProcessedCode } = processPostCSS(code, filename, rootDir);
+  // 1. Process Tailwind CSS directives (v3 / v4)
+  const { code: tailwindProcessedCode } = processTailwind(code, filename, rootDir);
+
+  // 2. Process PostCSS pipeline
+  const { code: postProcessedCode } = processPostCSS(tailwindProcessedCode, filename, rootDir);
 
   const importRegex = /@import\s+["']([^"']+)["'];?/g;
   const imports: string[] = [];

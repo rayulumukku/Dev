@@ -1,8 +1,10 @@
 import { globalCSSModuleGraph } from './CSSModuleGraph.js';
 import { processPostCSS } from './postcss/PostCSSPipeline.js';
+import { processTailwind } from './tailwind/TailwindPipeline.js';
 
 export function processCSS(code, filename, rootDir) {
-  const { code: postProcessedCode } = processPostCSS(code, filename, rootDir);
+  const { code: tailwindProcessedCode } = processTailwind(code, filename, rootDir);
+  const { code: postProcessedCode } = processPostCSS(tailwindProcessedCode, filename, rootDir);
 
   const importRegex = /@import\s+["']([^"']+)["'];?/g;
   const imports = [];
