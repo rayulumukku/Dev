@@ -1,7 +1,12 @@
 import { BundlerAdapter } from './types.js';
+import { RayAdapter } from './adapters/RayAdapter.js';
 
 export class BenchmarkRunner {
   private adapters = new Map<string, BundlerAdapter>();
+
+  constructor() {
+    this.registerAdapter(new RayAdapter());
+  }
 
   registerAdapter(adapter: BundlerAdapter): void {
     this.adapters.set(adapter.name, adapter);

@@ -1,6 +1,9 @@
+import { RayAdapter } from './adapters/RayAdapter.js';
+
 export class BenchmarkRunner {
   constructor() {
     this.adapters = new Map();
+    this.registerAdapter(new RayAdapter());
   }
 
   registerAdapter(adapter) {
