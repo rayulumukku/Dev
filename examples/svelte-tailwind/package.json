@@ -1,0 +1,10 @@
+{
+  "name": "example-svelte-tailwind",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/plugin-svelte": "^1.0.0",
+    "svelte": "^4.2.0"
+  }
+}

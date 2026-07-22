@@ -19,6 +19,7 @@ export default defineConfig({
       '@ray/plugin-manager': path.resolve(__dirname, './packages/plugin-manager/src/index.ts'),
       '@ray/language-server': path.resolve(__dirname, './packages/language-server/src/index.ts'),
       '@ray/vscode-extension': path.resolve(__dirname, './packages/vscode-extension/src/extension.ts'),
+      '@ray/plugin-svelte': path.resolve(__dirname, './packages/plugin-svelte/src/index.ts'),
     },
   },
   test: {
