@@ -4,4 +4,8 @@ export * from './CSSModuleGraph.js';
 export * from './CSSLoader.js';
 export * from './CSSPipeline.js';
 export * from './HMR.js';
+export * from './postcss/ConfigLoader.js';
+export * from './postcss/Cache.js';
+export * from './postcss/Processor.js';
+export * from './postcss/PostCSSPipeline.js';
 export { cssPlugin, cssPlugin as default } from './CSSPlugin.js';

@@ -1,0 +1,14 @@
+{
+  "name": "postcss-basic",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "ray dev",
+    "build": "ray build"
+  },
+  "devDependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/plugin-css": "^1.0.0",
+    "postcss": "^8.4.0"
+  }
+}
