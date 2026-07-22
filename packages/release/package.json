@@ -1,0 +1,18 @@
+{
+  "name": "@ray/release",
+  "version": "1.0.0",
+  "description": "Automated monorepo release management, versioning, changelog generation, and publish ordering for Ray",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

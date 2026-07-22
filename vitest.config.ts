@@ -33,6 +33,7 @@ export default defineConfig({
       '@ray/edge-runtime': path.resolve(__dirname, './packages/edge-runtime/src/index.ts'),
       '@ray/deployment': path.resolve(__dirname, './packages/deployment/src/index.ts'),
       'create-deployment-adapter': path.resolve(__dirname, './packages/create-deployment-adapter/src/cli.ts'),
+      '@ray/release': path.resolve(__dirname, './packages/release/src/index.ts'),
     },
   },
   test: {

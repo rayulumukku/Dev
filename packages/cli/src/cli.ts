@@ -908,6 +908,51 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'release') {
+  (async () => {
+    try {
+      const { ReleaseManager } = await import('@ray/release');
+      const sub = args[1] || 'plan';
+      const plan = ReleaseManager.createPlan();
+
+      if (sub === 'plan') {
+        console.log(`\n📦 Ray Monorepo Release Plan:\n`);
+        console.log(JSON.stringify(plan, null, 2));
+      } else if (sub === 'validate') {
+        const val = ReleaseManager.validate(plan);
+        console.log(`\n✅ Release Validation: ${val.valid ? 'PASSED' : 'FAILED'}`);
+        if (val.errors.length > 0) console.error(val.errors.join('\n'));
+      } else if (sub === 'changelog') {
+        const markdown = ReleaseManager.generateChangelog(plan);
+        console.log(`\n📝 Generated Release Changelog:\n\n${markdown}`);
+      } else if (sub === 'publish') {
+        console.log(`\n🚀 Ray Release Publish Sequence (Publish Order):\n`);
+        for (const pkg of plan.publishOrder) {
+          console.log(`  > Publishing ${pkg}...`);
+        }
+        console.log('\n🎉 Release publish plan completed!');
+      }
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Release command failed:', err.message);
+      process.exit(1);
+    }
+  })();
+} else if (command === 'version') {
+  (async () => {
+    try {
+      const { ReleaseManager } = await import('@ray/release');
+      const plan = ReleaseManager.createPlan();
+      console.log(`\n🏷️ Ray Workspace Package Versions:\n`);
+      for (const p of plan.packages) {
+        console.log(`  ${p.name.padEnd(25)} ${p.currentVersion} -> ${p.nextVersion} (${p.bumpType})`);
+      }
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Version command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'deploy') {
   (async () => {
     try {

@@ -41,7 +41,8 @@
       "@ray/inspector": ["./packages/inspector/src/index.ts"],
       "@ray/edge-runtime": ["./packages/edge-runtime/src/index.ts"],
       "@ray/deployment": ["./packages/deployment/src/index.ts"],
-      "create-deployment-adapter": ["./packages/create-deployment-adapter/src/cli.ts"]
+      "create-deployment-adapter": ["./packages/create-deployment-adapter/src/cli.ts"],
+      "@ray/release": ["./packages/release/src/index.ts"]
     }
   }
 }

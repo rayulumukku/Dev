@@ -21,6 +21,7 @@
     { "path": "../observability" },
     { "path": "../inspector" },
     { "path": "../edge-runtime" },
-    { "path": "../deployment" }
+    { "path": "../deployment" },
+    { "path": "../release" }
   ]
 }
