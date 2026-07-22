@@ -7,17 +7,21 @@ import { runMigrateCommand } from '../../packages/cli/src/commands/migrate.js';
 describe('Migrate Configuration Detection & Loading Layer Tests', () => {
   const testDir = path.resolve(process.cwd(), 'temp-migrate-test-pr2');
 
+  const safeCleanup = (dir: string) => {
+    try {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+      }
+    } catch {}
+  };
+
   beforeEach(() => {
-    if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    }
+    safeCleanup(testDir);
     fs.mkdirSync(testDir, { recursive: true });
   });
 
   afterEach(() => {
-    if (fs.existsSync(testDir)) {
-      fs.rmSync(testDir, { recursive: true, force: true });
-    }
+    safeCleanup(testDir);
   });
 
   // --- Detection Tests ---
