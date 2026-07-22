@@ -1,0 +1,9 @@
+{
+  "name": "example-react-mdx",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ray dev",
+    "build": "ray build"
+  }
+}
