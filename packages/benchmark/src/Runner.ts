@@ -1,11 +1,13 @@
 import { BundlerAdapter } from './types.js';
 import { RayAdapter } from './adapters/RayAdapter.js';
+import { ViteAdapter } from './adapters/ViteAdapter.js';
 
 export class BenchmarkRunner {
   private adapters = new Map<string, BundlerAdapter>();
 
   constructor() {
     this.registerAdapter(new RayAdapter());
+    this.registerAdapter(new ViteAdapter());
   }
 
   registerAdapter(adapter: BundlerAdapter): void {

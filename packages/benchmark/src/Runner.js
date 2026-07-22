@@ -1,9 +1,11 @@
 import { RayAdapter } from './adapters/RayAdapter.js';
+import { ViteAdapter } from './adapters/ViteAdapter.js';
 
 export class BenchmarkRunner {
   constructor() {
     this.adapters = new Map();
     this.registerAdapter(new RayAdapter());
+    this.registerAdapter(new ViteAdapter());
   }
 
   registerAdapter(adapter) {

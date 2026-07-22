@@ -12,3 +12,7 @@ export * from './adapters/StartupRunner.js';
 export * from './adapters/HMRLatency.js';
 export * from './adapters/BuildRunner.js';
 export * from './adapters/RayAdapter.js';
+export * from './adapters/ViteProject.js';
+export * from './adapters/ViteRunner.js';
+export * from './adapters/ViteValidator.js';
+export * from './adapters/ViteAdapter.js';
