@@ -24,7 +24,9 @@
       "@ray/plugin-analyzer": ["./packages/plugin-analyzer/src/index.ts"],
       "@ray/incremental-build": ["./packages/incremental-build/src/index.ts"],
       "@ray/plugin-sdk": ["./packages/plugin-sdk/src/index.ts"],
-      "create-ray-plugin": ["./packages/create-ray-plugin/src/cli.ts"]
+      "create-ray-plugin": ["./packages/create-ray-plugin/src/cli.ts"],
+      "@ray/plugin-registry": ["./packages/plugin-registry/src/index.ts"],
+      "@ray/plugin-manager": ["./packages/plugin-manager/src/index.ts"]
     }
   }
 }

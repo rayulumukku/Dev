@@ -266,16 +266,80 @@ if (command === 'dev') {
   })();
 } else if (command === 'plugin') {
   const sub = args[1];
+  const target = args[2];
   (async () => {
     try {
       const { validatePlugin, generatePluginDocs } = await import('@ray/plugin-sdk');
+      const { RegistryClient } = await import('@ray/plugin-registry');
+      const { PluginInstaller, PluginUninstaller, PluginUpdater, PluginLister, PluginDoctor, PluginPublisher } = await import('@ray/plugin-manager');
       const { RayCore } = await import('@ray/core');
       const core = new RayCore(process.cwd());
       await core.init();
 
       const plugins = core.config.plugins || [];
 
-      if (sub === 'validate') {
+      if (sub === 'search') {
+        const client = new RegistryClient();
+        const results = await client.search(target || '');
+        console.log(`\n🔍 Found ${results.length} Ray plugin(s):\n`);
+        for (const r of results) {
+          console.log(`  📦 ${r.name} (v${r.version}) - ${r.description}`);
+        }
+        process.exit(0);
+      } else if (sub === 'install') {
+        if (!target) {
+          console.error('Error: Please specify a plugin name or path to install.');
+          process.exit(1);
+        }
+        const installer = new PluginInstaller({ projectRoot: process.cwd() });
+        const res = installer.install(target);
+        console.log(`\n🎉 Installed plugin "${res.name}" (v${res.version}) into .ray/plugins/`);
+        process.exit(0);
+      } else if (sub === 'uninstall') {
+        if (!target) {
+          console.error('Error: Please specify a plugin name to uninstall.');
+          process.exit(1);
+        }
+        const uninstaller = new PluginUninstaller(process.cwd());
+        uninstaller.uninstall(target);
+        console.log(`\n🗑️  Uninstalled plugin "${target}"`);
+        process.exit(0);
+      } else if (sub === 'update') {
+        const updater = new PluginUpdater(process.cwd());
+        const res = updater.update();
+        console.log(`\n⚡ Updated ${res.updatedCount} plugin(s) in lockfile.`);
+        process.exit(0);
+      } else if (sub === 'list') {
+        const lister = new PluginLister(process.cwd());
+        const list = lister.list();
+        console.log(`\n📦 Installed Ray Plugins (${Object.keys(list).length}):\n`);
+        for (const [name, entry] of Object.entries(list)) {
+          console.log(`  - ${name} @ ${entry.version} (source: ${entry.source})`);
+        }
+        process.exit(0);
+      } else if (sub === 'doctor') {
+        const doctor = new PluginDoctor(process.cwd());
+        const report = doctor.diagnose();
+        console.log(`\n🩺 Ray Plugin Health Report:\n`);
+        if (report.healthy) {
+          console.log(`  [✔] All plugins are healthy!`);
+        } else {
+          for (const issue of report.issues) {
+            console.error(`  [❌] ${issue.plugin} (${issue.code}): ${issue.message}`);
+          }
+        }
+        process.exit(report.healthy ? 0 : 1);
+      } else if (sub === 'publish') {
+        const publisher = new PluginPublisher(process.cwd());
+        const pubRes = publisher.publish();
+        if (pubRes.valid) {
+          console.log(`\n🚀 Package "${pubRes.name}" (v${pubRes.version}) validated and ready for publish!`);
+          process.exit(0);
+        } else {
+          console.error(`\n❌ Publishing validation failed:\n  - ${pubRes.errors.join('\n  - ')}`);
+          process.exit(1);
+        }
+      } else if (sub === 'validate') {
         console.log(`[Ray Plugin SDK] Validating ${plugins.length} active plugin(s)...`);
         let allValid = true;
         for (const p of plugins) {
@@ -300,7 +364,7 @@ if (command === 'dev') {
         }
         process.exit(0);
       } else {
-        console.error(`Unknown plugin command: "ray plugin ${sub}". Available: validate, docs`);
+        console.error(`Unknown plugin command: "ray plugin ${sub}". Available: search, install, uninstall, update, list, doctor, publish, validate, docs`);
         process.exit(1);
       }
     } catch (err: any) {

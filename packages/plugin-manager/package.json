@@ -1,0 +1,21 @@
+{
+  "name": "@ray/plugin-manager",
+  "version": "1.0.0",
+  "description": "Official Ray plugin package management system",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/plugin-sdk": "^1.0.0",
+    "@ray/plugin-registry": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

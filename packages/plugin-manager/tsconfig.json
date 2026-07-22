@@ -6,6 +6,7 @@
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../plugin-sdk" }
+    { "path": "../plugin-sdk" },
+    { "path": "../plugin-registry" }
   ]
 }

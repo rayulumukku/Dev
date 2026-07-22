@@ -11,6 +11,12 @@ export default defineConfig({
       '@ray/transform': path.resolve(__dirname, './packages/transform/src/index.ts'),
       '@ray/hmr-runtime': path.resolve(__dirname, './packages/hmr-runtime/src/index.ts'),
       '@ray/compiler-rust': path.resolve(__dirname, './packages/compiler-rust/src/index.ts'),
+      '@ray/plugin-mdx': path.resolve(__dirname, './packages/plugin-mdx/src/index.ts'),
+      '@ray/plugin-analyzer': path.resolve(__dirname, './packages/plugin-analyzer/src/index.ts'),
+      '@ray/incremental-build': path.resolve(__dirname, './packages/incremental-build/src/index.ts'),
+      '@ray/plugin-sdk': path.resolve(__dirname, './packages/plugin-sdk/src/index.ts'),
+      '@ray/plugin-registry': path.resolve(__dirname, './packages/plugin-registry/src/index.ts'),
+      '@ray/plugin-manager': path.resolve(__dirname, './packages/plugin-manager/src/index.ts'),
     },
   },
   test: {

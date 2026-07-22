@@ -10,6 +10,8 @@
     { "path": "../core" },
     { "path": "../migrate" },
     { "path": "../plugin-analyzer" },
-    { "path": "../plugin-sdk" }
+    { "path": "../plugin-sdk" },
+    { "path": "../plugin-registry" },
+    { "path": "../plugin-manager" }
   ]
 }
