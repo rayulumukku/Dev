@@ -1,0 +1,18 @@
+{
+  "name": "@ray/server-actions",
+  "version": "1.0.0",
+  "description": "Generic Server Actions infrastructure for Ray supporting action registries, serialization, security validation, and manifests",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

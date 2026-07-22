@@ -1,0 +1,16 @@
+{
+  "name": "example-react-server-actions",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ray dev --ssr --rsc",
+    "build": "ray build --ssr --rsc"
+  },
+  "dependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/react-server": "^1.0.0",
+    "@ray/server-actions": "^1.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

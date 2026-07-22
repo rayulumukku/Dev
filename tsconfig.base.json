@@ -31,7 +31,8 @@
       "@ray/plugin-svelte": ["./packages/plugin-svelte/src/index.ts"],
       "@ray/plugin-solid": ["./packages/plugin-solid/src/index.ts"],
       "@ray/plugin-angular": ["./packages/plugin-angular/src/index.ts"],
-      "@ray/react-server": ["./packages/react-server/src/index.ts"]
+      "@ray/react-server": ["./packages/react-server/src/index.ts"],
+      "@ray/server-actions": ["./packages/server-actions/src/index.ts"]
     }
   }
 }

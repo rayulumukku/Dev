@@ -13,6 +13,7 @@
     { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-angular" },
     { "path": "./packages/react-server" },
+    { "path": "./packages/server-actions" },
     { "path": "./packages/plugin-mdx" },
     { "path": "./packages/plugin-analyzer" },
     { "path": "./packages/incremental-build" },

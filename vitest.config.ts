@@ -23,6 +23,7 @@ export default defineConfig({
       '@ray/plugin-solid': path.resolve(__dirname, './packages/plugin-solid/src/index.ts'),
       '@ray/plugin-angular': path.resolve(__dirname, './packages/plugin-angular/src/index.ts'),
       '@ray/react-server': path.resolve(__dirname, './packages/react-server/src/index.ts'),
+      '@ray/server-actions': path.resolve(__dirname, './packages/server-actions/src/index.ts'),
     },
   },
   test: {

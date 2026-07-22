@@ -2,7 +2,7 @@ import { RayPlugin } from '../index.js';
 import path from 'path';
 
 /**
- * Official Ray plugin for React workflows with experimental React Server Components (RSC) support.
+ * Official Ray plugin for React workflows with experimental React Server Components (RSC) and Server Actions support.
  */
 export function reactPlugin(options: any = {}): RayPlugin {
   return {
@@ -14,6 +14,17 @@ export function reactPlugin(options: any = {}): RayPlugin {
       if (!['.js', '.jsx', '.ts', '.tsx'].includes(ext)) return null;
 
       let finalCode = code;
+
+      // Handle experimental Server Actions if enabled
+      if (options.serverActions?.enabled || options.rsc?.enabled) {
+        try {
+          const { ActionCompiler } = require('@ray/server-actions');
+          const actionResult = ActionCompiler.compile(finalCode, id, options.serverActions);
+          finalCode = actionResult.code;
+        } catch {
+          // Fallback if @ray/server-actions is not installed
+        }
+      }
 
       // Handle experimental RSC boundary detection if enabled
       if (options.rsc?.enabled) {

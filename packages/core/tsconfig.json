@@ -12,6 +12,7 @@
     { "path": "../plugin-svelte" },
     { "path": "../plugin-solid" },
     { "path": "../plugin-angular" },
-    { "path": "../react-server" }
+    { "path": "../react-server" },
+    { "path": "../server-actions" }
   ]
 }
