@@ -8,18 +8,24 @@ import { globalRunner } from '../../packages/benchmark/src/Runner.js';
 
 const testTmpDir = path.resolve(process.cwd(), 'temp-vite-adapter-test');
 
+function safeRmDir(dir: string) {
+  if (fs.existsSync(dir)) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // ignore Windows file lock EPERM in test teardown
+    }
+  }
+}
+
 describe('Official Vite Benchmark Adapter (PR-20)', () => {
   beforeEach(() => {
-    if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
-    }
+    safeRmDir(testTmpDir);
     fs.mkdirSync(testTmpDir, { recursive: true });
   });
 
   afterEach(() => {
-    if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
-    }
+    safeRmDir(testTmpDir);
   });
 
   it('should implement BundlerAdapter contract and be auto-registered in globalRunner', () => {
