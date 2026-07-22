@@ -15,6 +15,7 @@
     { "path": "../plugin-manager" },
     { "path": "../project-graph" },
     { "path": "../test-adapter" },
-    { "path": "../test-runner" }
+    { "path": "../test-runner" },
+    { "path": "../observability" }
   ]
 }

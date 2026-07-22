@@ -870,6 +870,35 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'observe') {
+  (async () => {
+    try {
+      const { TraceCollector, Exporter, Session, MetricsCollector, Timeline } = await import('@ray/observability');
+      const exportFormatIdx = args.indexOf('--export');
+      const exportFormat = exportFormatIdx !== -1 && args[exportFormatIdx + 1] ? args[exportFormatIdx + 1] : 'json';
+      const live = args.includes('--live');
+
+      console.log(`\n📊 Ray Build Observability & Telemetry (Session: ${Session.getSessionId()})\n`);
+
+      const spans = TraceCollector.getSpans();
+      if (exportFormat === 'chrome-trace') {
+        const traceJson = Exporter.exportChromeTrace(spans);
+        console.log(`[Chrome Trace Output]\n${traceJson}`);
+      } else {
+        const json = Exporter.exportJSON(spans);
+        console.log(`[JSON Telemetry Output]\n${json}`);
+      }
+
+      if (live) {
+        console.log('\n📡 Listening for live build telemetry spans...');
+      }
+
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Observability command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'migrate') {
   (async () => {
     const result = await runMigrateCommand({ cwd: process.cwd() });

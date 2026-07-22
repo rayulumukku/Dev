@@ -17,6 +17,7 @@
     { "path": "../framework-runtime" },
     { "path": "../project-graph" },
     { "path": "../test-adapter" },
-    { "path": "../test-runner" }
+    { "path": "../test-runner" },
+    { "path": "../observability" }
   ]
 }
