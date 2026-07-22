@@ -21,6 +21,7 @@ export default defineConfig({
       '@ray/vscode-extension': path.resolve(__dirname, './packages/vscode-extension/src/extension.ts'),
       '@ray/plugin-svelte': path.resolve(__dirname, './packages/plugin-svelte/src/index.ts'),
       '@ray/plugin-solid': path.resolve(__dirname, './packages/plugin-solid/src/index.ts'),
+      '@ray/plugin-angular': path.resolve(__dirname, './packages/plugin-angular/src/index.ts'),
     },
   },
   test: {

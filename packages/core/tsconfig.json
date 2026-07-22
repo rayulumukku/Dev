@@ -10,6 +10,7 @@
     { "path": "../plugin-mdx" },
     { "path": "../incremental-build" },
     { "path": "../plugin-svelte" },
-    { "path": "../plugin-solid" }
+    { "path": "../plugin-solid" },
+    { "path": "../plugin-angular" }
   ]
 }

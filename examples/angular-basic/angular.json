@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "projects": {
+    "angular-basic": {
+      "root": "",
+      "sourceRoot": "src",
+      "projectType": "application"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@ray/plugin-angular",
+  "version": "1.0.0",
+  "description": "Official Ray Angular compilation plugin supporting AOT, templates, HMR, SSR, and SSG",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@angular/compiler": "^17.0.0",
+    "@angular/compiler-cli": "^17.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
