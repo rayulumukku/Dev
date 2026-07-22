@@ -16,6 +16,8 @@
     { "path": "./packages/observability" },
     { "path": "./packages/inspector" },
     { "path": "./packages/edge-runtime" },
+    { "path": "./packages/deployment" },
+    { "path": "./packages/create-deployment-adapter" },
     { "path": "./packages/plugin-svelte" },
     { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-angular" },

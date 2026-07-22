@@ -31,6 +31,8 @@ export default defineConfig({
       '@ray/observability': path.resolve(__dirname, './packages/observability/src/index.ts'),
       '@ray/inspector': path.resolve(__dirname, './packages/inspector/src/index.ts'),
       '@ray/edge-runtime': path.resolve(__dirname, './packages/edge-runtime/src/index.ts'),
+      '@ray/deployment': path.resolve(__dirname, './packages/deployment/src/index.ts'),
+      'create-deployment-adapter': path.resolve(__dirname, './packages/create-deployment-adapter/src/cli.ts'),
     },
   },
   test: {

@@ -18,6 +18,8 @@
     { "path": "../test-runner" },
     { "path": "../observability" },
     { "path": "../inspector" },
-    { "path": "../edge-runtime" }
+    { "path": "../edge-runtime" },
+    { "path": "../deployment" },
+    { "path": "../create-deployment-adapter" }
   ]
 }

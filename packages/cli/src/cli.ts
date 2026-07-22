@@ -908,6 +908,39 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'deploy') {
+  (async () => {
+    try {
+      const { createDeploymentContext, DeploymentPlanner, DeploymentManifest, Validation } = await import('@ray/deployment');
+      const adapterIdx = args.indexOf('--adapter');
+      const adapterName = adapterIdx !== -1 && args[adapterIdx + 1] ? args[adapterIdx + 1] : 'generic';
+      const dryRun = args.includes('--dry-run');
+      const planOnly = args.includes('--plan');
+
+      const outDir = path.resolve(process.cwd(), 'dist');
+      const ctx = createDeploymentContext(process.cwd(), outDir, adapterName, { dryRun, planOnly });
+
+      console.log(`\n🚀 Ray Deployment Adapter Orchestrator (Adapter: ${adapterName})\n`);
+
+      const plan = DeploymentPlanner.createPlan(ctx);
+      if (planOnly) {
+        console.log(`[Deployment Plan]\n${JSON.stringify(plan, null, 2)}`);
+        process.exit(0);
+      }
+
+      if (dryRun) {
+        console.log(`⚡ [Dry-Run] Deployment dry-run validation complete. Planned static files: ${plan.staticFiles.length}, server bundles: ${plan.serverBundles.length}`);
+        process.exit(0);
+      }
+
+      const manifest = DeploymentManifest.generateManifest(ctx, plan);
+      console.log(`🎉 Deployment packaging finalized cleanly! (Manifest: dist/deployment-manifest.json)\n`);
+      process.exit(0);
+    } catch (err: any) {
+      console.error('Deployment command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'observe') {
   (async () => {
     try {

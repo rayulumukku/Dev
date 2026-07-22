@@ -39,7 +39,9 @@
       "@ray/test-runner": ["./packages/test-runner/src/index.ts"],
       "@ray/observability": ["./packages/observability/src/index.ts"],
       "@ray/inspector": ["./packages/inspector/src/index.ts"],
-      "@ray/edge-runtime": ["./packages/edge-runtime/src/index.ts"]
+      "@ray/edge-runtime": ["./packages/edge-runtime/src/index.ts"],
+      "@ray/deployment": ["./packages/deployment/src/index.ts"],
+      "create-deployment-adapter": ["./packages/create-deployment-adapter/src/cli.ts"]
     }
   }
 }
