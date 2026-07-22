@@ -1,0 +1,33 @@
+{
+  "name": "@ray/vscode-extension",
+  "version": "1.0.0",
+  "description": "Official Ray VS Code extension providing IntelliSense, diagnostics, snippets, and project commands",
+  "publisher": "ray",
+  "main": "./dist/extension.js",
+  "types": "./dist/extension.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "contributes": {
+    "commands": [
+      { "command": "ray.startDevServer", "title": "Ray: Start Dev Server" },
+      { "command": "ray.buildProject", "title": "Ray: Build Project" },
+      { "command": "ray.runBenchmark", "title": "Ray: Run Benchmark" },
+      { "command": "ray.migrateProject", "title": "Ray: Migrate Project" },
+      { "command": "ray.createProject", "title": "Ray: Create Project" },
+      { "command": "ray.openBenchmarkReport", "title": "Ray: Open Benchmark Report" }
+    ],
+    "configuration": {
+      "title": "Ray Developer Tools",
+      "properties": {
+        "ray.cliPath": { "type": "string", "default": "", "description": "Custom path to Ray CLI executable" },
+        "ray.autoValidate": { "type": "boolean", "default": true, "description": "Enable real-time configuration diagnostics" },
+        "ray.diagnosticsSeverity": { "type": "string", "default": "error", "enum": ["error", "warning", "info"] }
+      }
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
