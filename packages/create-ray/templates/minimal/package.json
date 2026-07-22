@@ -1,0 +1,13 @@
+{
+  "name": "{{projectName}}",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "ray dev",
+    "build": "ray build",
+    "preview": "ray preview"
+  },
+  "devDependencies": {
+    "@ray/cli": "^1.0.0"
+  }
+}

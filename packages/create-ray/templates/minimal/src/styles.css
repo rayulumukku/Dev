@@ -1,0 +1,11 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+.box {
+  padding: 3rem;
+  text-align: center;
+}
