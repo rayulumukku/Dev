@@ -1,4 +1,4 @@
-export type ProjectScale = 'small' | 'medium' | 'large';
+export type ProjectScale = 'small' | 'medium' | 'large' | 'huge';
 export type OutputFormat = 'json' | 'markdown' | 'html';
 
 export interface BenchmarkOptions {
@@ -7,6 +7,15 @@ export interface BenchmarkOptions {
   runs: number;
   outputFormat: OutputFormat;
   outDir?: string;
+  seed?: number;
+}
+
+export interface GeneratorOptions {
+  projectName: string;
+  targetDir: string;
+  scale: ProjectScale;
+  seed?: number;
+  framework?: 'react' | 'vue' | 'vanilla';
 }
 
 export interface RawMetrics {

@@ -18,7 +18,7 @@ export async function executeBenchmark(options) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ray-benchmark-'));
 
   try {
-    generateSyntheticProject(tempDir, options.projectScale);
+    generateSyntheticProject(tempDir, options.projectScale, options.seed || 42);
 
     for (const bundlerName of options.bundlers) {
       const adapter = globalRunner.getAdapter(bundlerName);

@@ -19,7 +19,7 @@ export async function executeBenchmark(options: BenchmarkOptions): Promise<Bench
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ray-benchmark-'));
 
   try {
-    generateSyntheticProject(tempDir, options.projectScale);
+    generateSyntheticProject(tempDir, options.projectScale, options.seed || 42);
 
     for (const bundlerName of options.bundlers) {
       const adapter = globalRunner.getAdapter(bundlerName);
@@ -32,7 +32,6 @@ export async function executeBenchmark(options: BenchmarkOptions): Promise<Bench
           rawList.push(metrics);
           if (adapter.cleanup) await adapter.cleanup(tempDir);
         } else {
-          // Synthetic mock metrics for un-registered bundlers in framework test
           const baseBuild = bundlerName === 'ray' ? 80 : 150;
           rawList.push({
             coldStartTime: Math.round(baseBuild * 0.8),

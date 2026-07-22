@@ -9,6 +9,7 @@ export async function runBenchmarkCLI(args: string[]) {
   let projectScale: ProjectScale = 'small';
   let runs = 10;
   let outputFormat: OutputFormat = 'markdown';
+  let seed = 42;
   let outDir = process.cwd();
 
   for (let i = 0; i < args.length; i++) {
@@ -25,6 +26,9 @@ export async function runBenchmarkCLI(args: string[]) {
     } else if (arg === '--output' && args[i + 1]) {
       outputFormat = args[i + 1] as OutputFormat;
       i++;
+    } else if (arg === '--seed' && args[i + 1]) {
+      seed = parseInt(args[i + 1], 10);
+      i++;
     }
   }
 
@@ -38,9 +42,10 @@ export async function runBenchmarkCLI(args: string[]) {
     runs,
     outputFormat,
     outDir,
+    seed,
   };
 
-  console.log(`\n⚡ [Ray Benchmark] Executing benchmarks (${bundlers.join(', ')} | scale: ${projectScale} | runs: ${runs})...`);
+  console.log(`\n⚡ [Ray Benchmark] Executing benchmarks (${bundlers.join(', ')} | scale: ${projectScale} | seed: ${seed} | runs: ${runs})...`);
 
   const report = await executeBenchmark(options);
 
