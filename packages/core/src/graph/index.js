@@ -1,12 +1,29 @@
 import { ModuleNode } from './moduleNode.js';
+import { createModuleSnapshot, createDependencyEdgeInfo, createGraphSnapshot } from './events.js';
+
 export class DependencyGraph {
     modules = new Map();
+    pluginContainer;
+
+    constructor(options) {
+        if (options?.pluginContainer) {
+            this.pluginContainer = options.pluginContainer;
+        }
+    }
+
+    setPluginContainer(container) {
+        this.pluginContainer = container;
+    }
+
     getModule(id) {
         return this.modules.get(id);
     }
+
     registerModule(id, file, url) {
+        let isNew = false;
         let node = this.modules.get(id);
         if (!node) {
+            isNew = true;
             node = new ModuleNode(id, file, url);
             this.modules.set(id, node);
         }
@@ -15,8 +32,15 @@ export class DependencyGraph {
             node.file = file;
             node.url = url;
         }
+
+        if (isNew && this.pluginContainer && typeof this.pluginContainer.onModuleDiscovered === 'function') {
+            const snap = createModuleSnapshot(node);
+            Promise.resolve(this.pluginContainer.onModuleDiscovered(snap)).catch(() => {});
+        }
+
         return node;
     }
+
     /**
      * Updates the dependency list for a node.
      * Removes stale edges, creates placeholder nodes if a dependency is untracked,
@@ -33,34 +57,59 @@ export class DependencyGraph {
         node.dependencies.clear();
         // Rebuild dependency links
         for (const depId of depIds) {
+            let isNewDep = false;
             let depNode = this.modules.get(depId);
             if (!depNode) {
+                isNewDep = true;
                 const meta = resolveDepMeta(depId);
                 depNode = new ModuleNode(depId, meta.file, meta.url);
                 this.modules.set(depId, depNode);
             }
             node.dependencies.add(depNode);
             depNode.importers.add(node);
+
+            if (isNewDep && this.pluginContainer && typeof this.pluginContainer.onModuleDiscovered === 'function') {
+                const snap = createModuleSnapshot(depNode);
+                Promise.resolve(this.pluginContainer.onModuleDiscovered(snap)).catch(() => {});
+            }
+
+            if (this.pluginContainer && typeof this.pluginContainer.onDependencyResolved === 'function') {
+                const edge = createDependencyEdgeInfo(nodeId, depId);
+                Promise.resolve(this.pluginContainer.onDependencyResolved(edge)).catch(() => {});
+            }
+        }
+
+        if (this.pluginContainer && typeof this.pluginContainer.onGraphUpdated === 'function') {
+            const snap = createGraphSnapshot(this);
+            Promise.resolve(this.pluginContainer.onGraphUpdated(snap)).catch(() => {});
         }
     }
+
     getImporters(id) {
         const node = this.modules.get(id);
         if (!node)
             return new Set();
         return new Set(Array.from(node.importers).map((m) => m.id));
     }
+
     getDependencies(id) {
         const node = this.modules.get(id);
         if (!node)
             return new Set();
         return new Set(Array.from(node.dependencies).map((m) => m.id));
     }
+
     invalidate(id) {
         const node = this.modules.get(id);
         if (node) {
             node.lastTransformTime = 0;
+            if (this.pluginContainer && typeof this.pluginContainer.onGraphInvalidated === 'function') {
+                const snap = createModuleSnapshot(node);
+                Promise.resolve(this.pluginContainer.onGraphInvalidated(snap)).catch(() => {});
+            }
         }
     }
+
     /**
      * Serializes the graph to JSON format for diagnostics endpoint.
      */
@@ -75,4 +124,3 @@ export class DependencyGraph {
         };
     }
 }
-//# sourceMappingURL=index.js.map

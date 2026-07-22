@@ -1,15 +1,32 @@
 import { ModuleNode } from './moduleNode.js';
+import { createModuleSnapshot, createDependencyEdgeInfo, createGraphSnapshot } from './events.js';
+
+export * from './types.js';
+export * from './events.js';
 
 export class DependencyGraph {
   modules = new Map<string, ModuleNode>();
+  pluginContainer?: any;
+
+  constructor(options?: { pluginContainer?: any }) {
+    if (options?.pluginContainer) {
+      this.pluginContainer = options.pluginContainer;
+    }
+  }
+
+  setPluginContainer(container: any) {
+    this.pluginContainer = container;
+  }
 
   getModule(id: string): ModuleNode | undefined {
     return this.modules.get(id);
   }
 
   registerModule(id: string, file: string, url: string): ModuleNode {
+    let isNew = false;
     let node = this.modules.get(id);
     if (!node) {
+      isNew = true;
       node = new ModuleNode(id, file, url);
       this.modules.set(id, node);
     } else {
@@ -17,6 +34,12 @@ export class DependencyGraph {
       node.file = file;
       node.url = url;
     }
+
+    if (isNew && this.pluginContainer && typeof this.pluginContainer.onModuleDiscovered === 'function') {
+      const snap = createModuleSnapshot(node);
+      Promise.resolve(this.pluginContainer.onModuleDiscovered(snap)).catch(() => {});
+    }
+
     return node;
   }
 
@@ -41,14 +64,31 @@ export class DependencyGraph {
 
     // Rebuild dependency links
     for (const depId of depIds) {
+      let isNewDep = false;
       let depNode = this.modules.get(depId);
       if (!depNode) {
+        isNewDep = true;
         const meta = resolveDepMeta(depId);
         depNode = new ModuleNode(depId, meta.file, meta.url);
         this.modules.set(depId, depNode);
       }
       node.dependencies.add(depNode);
       depNode.importers.add(node);
+
+      if (isNewDep && this.pluginContainer && typeof this.pluginContainer.onModuleDiscovered === 'function') {
+        const snap = createModuleSnapshot(depNode);
+        Promise.resolve(this.pluginContainer.onModuleDiscovered(snap)).catch(() => {});
+      }
+
+      if (this.pluginContainer && typeof this.pluginContainer.onDependencyResolved === 'function') {
+        const edge = createDependencyEdgeInfo(nodeId, depId);
+        Promise.resolve(this.pluginContainer.onDependencyResolved(edge)).catch(() => {});
+      }
+    }
+
+    if (this.pluginContainer && typeof this.pluginContainer.onGraphUpdated === 'function') {
+      const snap = createGraphSnapshot(this);
+      Promise.resolve(this.pluginContainer.onGraphUpdated(snap)).catch(() => {});
     }
   }
 
@@ -68,6 +108,10 @@ export class DependencyGraph {
     const node = this.modules.get(id);
     if (node) {
       node.lastTransformTime = 0;
+      if (this.pluginContainer && typeof this.pluginContainer.onGraphInvalidated === 'function') {
+        const snap = createModuleSnapshot(node);
+        Promise.resolve(this.pluginContainer.onGraphInvalidated(snap)).catch(() => {});
+      }
     }
   }
 

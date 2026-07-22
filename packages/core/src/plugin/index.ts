@@ -40,7 +40,12 @@ export interface RayPlugin {
   buildEnd?(this: PluginContext): Promise<void>;
   generateBundle?(this: PluginContext, bundle: any): Promise<void>;
   closeBundle?(this: PluginContext): Promise<void>;
+  onModuleDiscovered?(this: PluginContext, module: any): Promise<void> | void;
+  onDependencyResolved?(this: PluginContext, edge: any): Promise<void> | void;
+  onGraphInvalidated?(this: PluginContext, module: any): Promise<void> | void;
+  onGraphUpdated?(this: PluginContext, graph: any): Promise<void> | void;
 }
+
 
 export interface LibraryConfig {
   entry: string;

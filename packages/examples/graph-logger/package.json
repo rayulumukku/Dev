@@ -1,0 +1,7 @@
+{
+  "name": "@ray/example-graph-logger",
+  "version": "1.0.0",
+  "description": "Example Ray plugin observing dependency graph lifecycle events",
+  "main": "index.ts",
+  "license": "MIT"
+}

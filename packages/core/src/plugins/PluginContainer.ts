@@ -1,10 +1,24 @@
 import { RayPlugin } from './Plugin.js';
 import { PluginContext, PluginContextOptions } from './PluginContext.js';
-import { runResolveId, runLoad, runTransform } from './HookRunner.js';
+import {
+  runResolveId,
+  runLoad,
+  runTransform,
+  runModuleDiscovered,
+  runDependencyResolved,
+  runGraphInvalidated,
+  runGraphUpdated,
+} from './HookRunner.js';
+import { ModuleNodeInfo, DependencyEdgeInfo, GraphSnapshotInfo } from '../graph/types.js';
 
 export class PluginContainer {
   private plugins: RayPlugin[] = [];
   private context: PluginContext;
+
+  private hasModuleDiscovered = false;
+  private hasDependencyResolved = false;
+  private hasGraphInvalidated = false;
+  private hasGraphUpdated = false;
 
   constructor(plugins: RayPlugin[] = [], contextOptions?: Partial<PluginContextOptions>) {
     this.context = new PluginContext({
@@ -30,6 +44,7 @@ export class PluginContainer {
     }
     this.plugins.push(plugin);
     this.sortPlugins();
+    this.updateHookFlags();
   }
 
   private sortPlugins(): void {
@@ -50,6 +65,13 @@ export class PluginContainer {
     this.plugins = [...pre, ...normal, ...post];
   }
 
+  private updateHookFlags(): void {
+    this.hasModuleDiscovered = this.plugins.some((p) => typeof p.onModuleDiscovered === 'function');
+    this.hasDependencyResolved = this.plugins.some((p) => typeof p.onDependencyResolved === 'function');
+    this.hasGraphInvalidated = this.plugins.some((p) => typeof p.onGraphInvalidated === 'function');
+    this.hasGraphUpdated = this.plugins.some((p) => typeof p.onGraphUpdated === 'function');
+  }
+
   getPlugins(): RayPlugin[] {
     return [...this.plugins];
   }
@@ -68,5 +90,27 @@ export class PluginContainer {
 
   async transform(code: string, id: string): Promise<{ code: string; map?: any }> {
     return runTransform(this.plugins, code, id, this.context);
+  }
+
+  // Graph Lifecycle Methods (PR-06)
+
+  async onModuleDiscovered(module: ModuleNodeInfo): Promise<void> {
+    if (!this.hasModuleDiscovered) return;
+    return runModuleDiscovered(this.plugins, module, this.context);
+  }
+
+  async onDependencyResolved(edge: DependencyEdgeInfo): Promise<void> {
+    if (!this.hasDependencyResolved) return;
+    return runDependencyResolved(this.plugins, edge, this.context);
+  }
+
+  async onGraphInvalidated(module: ModuleNodeInfo): Promise<void> {
+    if (!this.hasGraphInvalidated) return;
+    return runGraphInvalidated(this.plugins, module, this.context);
+  }
+
+  async onGraphUpdated(graph: GraphSnapshotInfo): Promise<void> {
+    if (!this.hasGraphUpdated) return;
+    return runGraphUpdated(this.plugins, graph, this.context);
   }
 }
