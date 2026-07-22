@@ -52,6 +52,16 @@ export const eslint = eslintPlugin;
 export const pwa = pwaPlugin;
 export const image = imagePlugin;
 export * from './plugin/index.js';
+export {
+  PluginContainer as NativePluginContainer,
+  PluginContext as NativePluginContext,
+  runResolveId as runNativeResolveId,
+  runLoad as runNativeLoad,
+  runTransform as runNativeTransform,
+  type ResolveIdHook,
+  type LoadHook,
+  type TransformHook
+} from './plugins/index.js';
 
 import { runDoctor, printDoctorReport } from './diagnostics/doctor.js';
 import { displayStats } from './diagnostics/stats.js';

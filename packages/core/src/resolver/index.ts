@@ -50,12 +50,35 @@ export function resolveConditionalExports(exportsValue: any, importType?: string
 
 export class Resolver {
   projectRoot: string;
+  pluginContainer?: any;
   // In-memory cache for bare package resolutions
   resolutionCache = new Map<string, string>();
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, options?: { pluginContainer?: any }) {
     this.projectRoot = projectRoot;
+    if (options?.pluginContainer) {
+      this.pluginContainer = options.pluginContainer;
+    }
   }
+
+  /**
+   * Async plugin-aware module resolution.
+   * Calls plugin resolveId() hook before falling back to native resolution.
+   */
+  async resolveId(specifier: string, importer?: string): Promise<string | null> {
+    if (this.pluginContainer && typeof this.pluginContainer.resolveId === 'function') {
+      const pluginResolved = await this.pluginContainer.resolveId(specifier, importer);
+      if (pluginResolved !== null && pluginResolved !== undefined) {
+        return pluginResolved;
+      }
+    }
+    try {
+      return this.resolveBarePackage(specifier, importer || this.projectRoot);
+    } catch {
+      return null;
+    }
+  }
+
 
   /**
    * Resolves a bare package specifier (e.g. 'react', 'react-dom/client') to its absolute file path.

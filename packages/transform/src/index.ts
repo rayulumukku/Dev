@@ -36,14 +36,41 @@ async function getCompiler(): Promise<any> {
   return _compiler;
 }
 
+export interface TransformOptions {
+  minify?: boolean;
+  plugins?: any[];
+  pluginContainer?: any;
+}
+
+async function runPluginTransforms(code: string, filename: string, options?: TransformOptions): Promise<string> {
+  if (options?.pluginContainer && typeof options.pluginContainer.transform === 'function') {
+    const res = await options.pluginContainer.transform(code, filename);
+    return res?.code ?? code;
+  }
+  if (options?.plugins && Array.isArray(options.plugins) && options.plugins.length > 0) {
+    let currentCode = code;
+    for (const plugin of options.plugins) {
+      if (typeof plugin.transform === 'function') {
+        const res = await plugin.transform(currentCode, filename);
+        if (res) {
+          currentCode = typeof res === 'string' ? res : (res.code ?? currentCode);
+        }
+      }
+    }
+    return currentCode;
+  }
+  return code;
+}
+
 /**
  * Transforms JS/JSX/TS/TSX code using Ray's native compiler.
- * Drop-in replacement for the previous esbuild-based transformJsx().
+ * Supports plugin transform hooks prior to core compilation.
  */
-export async function transformJsx(code: string, filename: string): Promise<string> {
+export async function transformJsx(code: string, filename: string, options?: TransformOptions): Promise<string> {
   try {
+    const codeAfterPlugins = await runPluginTransforms(code, filename, options);
     const compiler = await getCompiler();
-    const result = compiler.compile(code, filename);
+    const result = compiler.compile(codeAfterPlugins, filename);
     return result.code;
   } catch (err: any) {
     console.warn(`[Ray Transform] Compile failed for ${path.basename(filename)}: ${err.message}`);
@@ -53,15 +80,17 @@ export async function transformJsx(code: string, filename: string): Promise<stri
 
 /**
  * Async compile with full { code, map } output.
+ * Supports plugin transform hooks prior to core compilation.
  */
 export async function transformFile(
   code: string,
   filename: string,
-  options: { minify?: boolean } = {}
+  options: TransformOptions = {}
 ): Promise<{ code: string; map?: string }> {
   try {
+    const codeAfterPlugins = await runPluginTransforms(code, filename, options);
     const compiler = await getCompiler();
-    const result = compiler.compile(code, filename, options);
+    const result = compiler.compile(codeAfterPlugins, filename, options);
     return {
       code: result.code,
       map: typeof result.map === 'string' ? result.map : JSON.stringify(result.map),
@@ -71,3 +100,4 @@ export async function transformFile(
     return { code };
   }
 }
+
