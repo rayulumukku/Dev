@@ -63,6 +63,41 @@ if (command === 'dev') {
       process.exit(1);
     }
   })();
+} else if (command === 'analyze') {
+  (async () => {
+    try {
+      const open = args.includes('--open');
+      const json = !args.includes('--no-json');
+      const html = !args.includes('--no-html');
+
+      let outDir = 'dist/analyzer';
+      const outputIdx = args.indexOf('--output');
+      if (outputIdx !== -1 && args[outputIdx + 1]) {
+        outDir = args[outputIdx + 1];
+      }
+
+      console.log(`[Ray CLI] Running production build and bundle size analysis...`);
+      const { analyzer } = await import('@ray/plugin-analyzer');
+      const { buildProject } = await import('@ray/core');
+
+      const analyzerPlugin = analyzer({ open, json, html, outDir });
+
+      await buildProject({
+        outDir: 'dist',
+        minify: true,
+        sourcemap: 'external',
+        watch: false,
+        analyze: true,
+        plugins: [analyzerPlugin],
+        mode: 'production',
+      });
+
+      process.exit(0);
+    } catch (err: any) {
+      console.error('[Ray Analyze Error] Analysis failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'build') {
   let buildMode = 'production';
   const modeIdx = args.indexOf('--mode');

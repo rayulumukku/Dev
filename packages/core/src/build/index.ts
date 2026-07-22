@@ -21,6 +21,7 @@ interface BuildOptions {
   dts?: boolean;
   mode?: string;
   remote?: boolean;
+  plugins?: any[];
 }
 
 /**
@@ -36,6 +37,10 @@ export async function buildProject(options: BuildOptions) {
   // Initialize RayCore orchestrator
   const core = new RayCore(projectRoot, options.mode || 'production');
   await core.init();
+
+  if (options.plugins && Array.isArray(options.plugins)) {
+    core.config.plugins = [...(core.config.plugins || []), ...options.plugins];
+  }
 
   if (options.remote) {
     const { DistributedBuildExecutor } = await import('./remoteExecutor.js');

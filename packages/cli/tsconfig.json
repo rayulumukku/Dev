@@ -8,6 +8,7 @@
   "references": [
     { "path": "../dev-server" },
     { "path": "../core" },
-    { "path": "../migrate" }
+    { "path": "../migrate" },
+    { "path": "../plugin-analyzer" }
   ]
 }
