@@ -1,0 +1,10 @@
+{
+  "name": "example-solid-tailwind",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/plugin-solid": "^1.0.0",
+    "solid-js": "^1.8.0"
+  }
+}

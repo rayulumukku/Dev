@@ -9,6 +9,7 @@
     { "path": "../transform" },
     { "path": "../plugin-mdx" },
     { "path": "../incremental-build" },
-    { "path": "../plugin-svelte" }
+    { "path": "../plugin-svelte" },
+    { "path": "../plugin-solid" }
   ]
 }

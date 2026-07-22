@@ -1,24 +1,20 @@
 import { RayPlugin } from '../index.js';
-import path from 'path';
 
 /**
  * Official Ray plugin for SolidJS workflows.
- * Optimizes SolidJS jsx/tsx templates and reactive markers.
+ * Delegates dynamically to `@ray/plugin-solid`.
  */
-export function solidPlugin(): RayPlugin {
-  return {
-    name: '@ray/plugin-solid',
-
-    async transform(code, id) {
-      const ext = path.extname(id);
-      if (!['.js', '.jsx', '.ts', '.tsx'].includes(ext)) return null;
-
-      // In a real plugin, this would invoke babel-preset-solid.
-      // For standard compilation support, we verify Solid reactivity markers.
-      if (code.includes('solid-js')) {
-        return { code };
-      }
-      return null;
-    },
-  };
+export function solidPlugin(options: any = {}): RayPlugin {
+  try {
+    const { solidPlugin: delegate } = require('@ray/plugin-solid');
+    return delegate(options);
+  } catch {
+    return {
+      name: '@ray/plugin-solid',
+      async transform(code: string, id: string) {
+        if (code.includes('solid-js')) return { code };
+        return null;
+      },
+    };
+  }
 }

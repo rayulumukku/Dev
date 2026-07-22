@@ -10,6 +10,7 @@
     { "path": "./packages/language-server" },
     { "path": "./packages/vscode-extension" },
     { "path": "./packages/plugin-svelte" },
+    { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-mdx" },
     { "path": "./packages/plugin-analyzer" },
     { "path": "./packages/incremental-build" },

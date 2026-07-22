@@ -1,0 +1,20 @@
+{
+  "name": "@ray/plugin-solid",
+  "version": "1.0.0",
+  "description": "Official Ray SolidJS compilation plugin supporting fine-grained HMR, CSS processing, SSR, and SSG",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "solid-js": "^1.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
