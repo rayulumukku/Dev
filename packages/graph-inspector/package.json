@@ -1,0 +1,21 @@
+{
+  "name": "@ray/graph-inspector",
+  "version": "1.0.0",
+  "description": "Real-time visual dependency graph inspector for Ray",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "ray-graph": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
