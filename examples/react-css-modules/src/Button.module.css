@@ -1,0 +1,17 @@
+.container {
+  padding: 24px;
+  background-color: #f1f5f9;
+}
+
+.title {
+  color: #0f172a;
+}
+
+.primaryButton {
+  background-color: #2563eb;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}

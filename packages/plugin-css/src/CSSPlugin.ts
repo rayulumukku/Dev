@@ -1,6 +1,7 @@
 import { RayPlugin } from '@ray/core';
 import { CSSPluginOptions } from './types.js';
 import { processCSS } from './CSSPipeline.js';
+import { processCSSModule } from './modules/CSSModules.js';
 import { generateCSSHMR } from './HMR.js';
 import { globalCSSCache } from './CSSCache.js';
 
@@ -13,9 +14,21 @@ export function cssPlugin(options: CSSPluginOptions = {}): RayPlugin {
       return null;
     },
 
-    transform(code: string, id: string) {
+    transform(code: string, id: string, context?: any) {
       if (!id.endsWith('.css')) return null;
 
+      const isProduction = context?.isProduction ?? false;
+
+      // Handle CSS Modules (*.module.css)
+      if (id.endsWith('.module.css')) {
+        const { jsCode } = processCSSModule(code, id, isProduction);
+        const hmrCode = generateCSSHMR(id);
+        return {
+          code: `${jsCode}\n${hmrCode}`,
+        };
+      }
+
+      // Handle regular CSS files (.css)
       const { jsCode, imports } = processCSS(code, id);
 
       globalCSSCache.set(id, {

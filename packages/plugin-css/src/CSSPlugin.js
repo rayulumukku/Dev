@@ -1,4 +1,5 @@
 import { processCSS } from './CSSPipeline.js';
+import { processCSSModule } from './modules/CSSModules.js';
 import { generateCSSHMR } from './HMR.js';
 import { globalCSSCache } from './CSSCache.js';
 
@@ -11,8 +12,18 @@ export function cssPlugin(options = {}) {
       return null;
     },
 
-    transform(code, id) {
+    transform(code, id, context) {
       if (!id.endsWith('.css')) return null;
+
+      const isProduction = context?.isProduction ?? false;
+
+      if (id.endsWith('.module.css')) {
+        const { jsCode } = processCSSModule(code, id, isProduction);
+        const hmrCode = generateCSSHMR(id);
+        return {
+          code: `${jsCode}\n${hmrCode}`,
+        };
+      }
 
       const { jsCode, imports } = processCSS(code, id);
 
