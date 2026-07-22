@@ -1,0 +1,18 @@
+{
+  "name": "@ray/incremental-build",
+  "version": "1.0.0",
+  "description": "Official Ray incremental production build engine",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

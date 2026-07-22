@@ -5,6 +5,7 @@
     { "path": "./packages/compiler-rust" },
     { "path": "./packages/plugin-mdx" },
     { "path": "./packages/plugin-analyzer" },
+    { "path": "./packages/incremental-build" },
     { "path": "./packages/core" },
     { "path": "./packages/transform" },
     { "path": "./packages/dev-server" },

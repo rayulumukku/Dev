@@ -121,9 +121,11 @@ if (command === 'dev') {
     dts: undefined as boolean | undefined,
     mode: buildMode,
     remote: false,
+    incremental: undefined as boolean | undefined,
+    clean: false,
   };
 
-  // Parse watch, analyze, ssr & ssg boolean flags
+  // Parse watch, analyze, ssr, ssg, incremental & clean boolean flags
   if (args.includes('--watch')) {
     options.watch = true;
   }
@@ -135,6 +137,14 @@ if (command === 'dev') {
   }
   if (args.includes('--ssg')) {
     options.ssg = true;
+  }
+  if (args.includes('--incremental')) {
+    options.incremental = true;
+  } else if (args.includes('--no-incremental')) {
+    options.incremental = false;
+  }
+  if (args.includes('--clean')) {
+    options.clean = true;
   }
   if (args.includes('--lib')) {
     options.lib = true;

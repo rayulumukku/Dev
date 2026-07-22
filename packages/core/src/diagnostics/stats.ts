@@ -4,7 +4,7 @@ import path from 'path';
 /**
  * Display active server runtime telemetry and compilation caches statistics.
  */
-export function displayStats(projectRoot: string) {
+export async function displayStats(projectRoot: string) {
   console.log('\n⚡ Ray Dev Performance Statistics ⚡\n');
 
   // 1. Caches hit metrics
@@ -27,7 +27,24 @@ export function displayStats(projectRoot: string) {
   console.log(`  - Cached Bundles count:  ${cacheItemsCount}`);
   console.log(`  - Cache Hit Ratio:       ${cacheHitRatio}`);
 
-  // 2. Memory limits
+  // 2. Incremental Build Metrics
+  try {
+    const { IncrementalBuildEngine } = await import('@ray/incremental-build');
+    const incMetrics = IncrementalBuildEngine.getLastMetrics();
+
+    console.log(`\n> Incremental Production Build Engine`);
+    console.log(`  - Reused Artifacts:      ${incMetrics.reusedArtifacts}`);
+    console.log(`  - Rebuilt Artifacts:     ${incMetrics.rebuiltArtifacts}`);
+    console.log(`  - Incremental Hit Ratio: ${incMetrics.cacheHitRatio}%`);
+    console.log(`  - Build Time Savings:    ${incMetrics.timeSavedMs} ms`);
+    if (Object.keys(incMetrics.invalidationReasons).length > 0) {
+      console.log(`  - Invalidation Reasons:  ${JSON.stringify(incMetrics.invalidationReasons)}`);
+    }
+  } catch {
+    // Incremental engine not loaded
+  }
+
+  // 3. Memory limits
   const mem = process.memoryUsage();
   console.log(`\n> Memory Usage (Node Heap)`);
   console.log(`  - RSS:                   ${(mem.rss / 1024 / 1024).toFixed(2)} MB`);
@@ -35,7 +52,7 @@ export function displayStats(projectRoot: string) {
   console.log(`  - Heap Used:             ${(mem.heapUsed / 1024 / 1024).toFixed(2)} MB`);
   console.log(`  - External Buffers:      ${(mem.external / 1024 / 1024).toFixed(2)} MB`);
 
-  // 3. Platform configuration details
+  // 4. Platform configuration details
   console.log(`\n> Compiler Engine`);
   console.log(`  - Platform Target:       Node.js (${process.version})`);
   console.log(`  - OS Target:             ${process.platform}`);

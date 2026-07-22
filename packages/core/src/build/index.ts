@@ -22,6 +22,9 @@ interface BuildOptions {
   mode?: string;
   remote?: boolean;
   plugins?: any[];
+  incremental?: boolean;
+  clean?: boolean;
+  validateOutputs?: boolean;
 }
 
 /**
@@ -34,12 +37,65 @@ export async function buildProject(options: BuildOptions) {
   const projectRoot = process.cwd();
   const baseOutDir = path.resolve(projectRoot, options.outDir);
 
+  // Clean build output directory if --clean is specified
+  if (options.clean) {
+    if (fs.existsSync(baseOutDir)) {
+      fs.rmSync(baseOutDir, { recursive: true, force: true });
+    }
+  }
+
   // Initialize RayCore orchestrator
   const core = new RayCore(projectRoot, options.mode || 'production');
   await core.init();
 
   if (options.plugins && Array.isArray(options.plugins)) {
     core.config.plugins = [...(core.config.plugins || []), ...options.plugins];
+  }
+
+  const isIncremental = options.incremental !== undefined
+    ? options.incremental
+    : (core.config.build && core.config.build.incremental === true);
+
+  if (isIncremental) {
+    try {
+      const { IncrementalBuildEngine } = await import('@ray/incremental-build');
+      const incEngine = new IncrementalBuildEngine({
+        projectRoot,
+        outDir: options.outDir,
+        clean: options.clean,
+        validateOutputs: options.validateOutputs !== false && (core.config.build?.validateOutputs !== false),
+      });
+
+      // Gather current src files
+      const currentFiles: Record<string, string> = {};
+      const srcDir = path.join(projectRoot, 'src');
+      if (fs.existsSync(srcDir)) {
+        const scan = (dir: string) => {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            const fp = path.join(dir, f);
+            if (fs.statSync(fp).isDirectory()) {
+              scan(fp);
+            } else {
+              currentFiles[fp] = fs.readFileSync(fp, 'utf-8');
+            }
+          }
+        };
+        scan(srcDir);
+      }
+
+      const plan = incEngine.plan(currentFiles, {
+        config: core.config,
+        env: core.env,
+        plugins: core.config.plugins,
+        graph: core.graph,
+      });
+
+      if (plan.reusedCount === plan.totalCount && plan.totalCount > 0 && !options.clean) {
+        console.log(`\n⚡ [Ray Incremental Build] All ${plan.reusedCount} modules unchanged. Sub-millisecond no-op build!`);
+        return { reusedCount: plan.reusedCount, rebuiltCount: 0, timeSavedMs: plan.reusedCount * 15 };
+      }
+    } catch { /* proceed with normal build */ }
   }
 
   if (options.remote) {

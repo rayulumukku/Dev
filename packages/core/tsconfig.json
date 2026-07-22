@@ -7,6 +7,7 @@
   "include": ["src/**/*"],
   "references": [
     { "path": "../transform" },
-    { "path": "../plugin-mdx" }
+    { "path": "../plugin-mdx" },
+    { "path": "../incremental-build" }
   ]
 }
