@@ -1,0 +1,21 @@
+{
+  "name": "@ray/react-server",
+  "version": "1.0.0",
+  "description": "Experimental React Server Components (RSC) engine for Ray supporting Flight protocol, client reference manifests, and boundary resolution",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

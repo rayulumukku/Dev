@@ -29,7 +29,8 @@ if (command === 'dev') {
   }
 
   const ssr = args.includes('--ssr');
-  startDevServer({ port, ssr, mode });
+  const rsc = args.includes('--rsc');
+  startDevServer({ port, ssr, rsc, mode } as any);
 } else if (command === 'studio') {
   let port = 3000;
   const portIdx = args.indexOf('--port');
@@ -134,6 +135,9 @@ if (command === 'dev') {
   }
   if (args.includes('--ssr')) {
     options.ssr = true;
+  }
+  if (args.includes('--rsc')) {
+    (options as any).rsc = true;
   }
   if (args.includes('--ssg')) {
     options.ssg = true;

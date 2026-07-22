@@ -11,6 +11,7 @@
     { "path": "../incremental-build" },
     { "path": "../plugin-svelte" },
     { "path": "../plugin-solid" },
-    { "path": "../plugin-angular" }
+    { "path": "../plugin-angular" },
+    { "path": "../react-server" }
   ]
 }

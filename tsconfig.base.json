@@ -30,7 +30,8 @@
       "@ray/language-server": ["./packages/language-server/src/index.ts"],
       "@ray/plugin-svelte": ["./packages/plugin-svelte/src/index.ts"],
       "@ray/plugin-solid": ["./packages/plugin-solid/src/index.ts"],
-      "@ray/plugin-angular": ["./packages/plugin-angular/src/index.ts"]
+      "@ray/plugin-angular": ["./packages/plugin-angular/src/index.ts"],
+      "@ray/react-server": ["./packages/react-server/src/index.ts"]
     }
   }
 }

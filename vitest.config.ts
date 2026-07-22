@@ -22,6 +22,7 @@ export default defineConfig({
       '@ray/plugin-svelte': path.resolve(__dirname, './packages/plugin-svelte/src/index.ts'),
       '@ray/plugin-solid': path.resolve(__dirname, './packages/plugin-solid/src/index.ts'),
       '@ray/plugin-angular': path.resolve(__dirname, './packages/plugin-angular/src/index.ts'),
+      '@ray/react-server': path.resolve(__dirname, './packages/react-server/src/index.ts'),
     },
   },
   test: {

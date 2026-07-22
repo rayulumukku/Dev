@@ -2,11 +2,9 @@ import { RayPlugin } from '../index.js';
 import path from 'path';
 
 /**
- * Official Ray plugin for React workflows.
- * Extracts React component states, wraps PascalCase components in HMR proxies,
- * overrides react-dom/client createRoot context, and triggers stateful updates.
+ * Official Ray plugin for React workflows with experimental React Server Components (RSC) support.
  */
-export function reactPlugin(): RayPlugin {
+export function reactPlugin(options: any = {}): RayPlugin {
   return {
     name: '@ray/plugin-react',
 
@@ -16,6 +14,17 @@ export function reactPlugin(): RayPlugin {
       if (!['.js', '.jsx', '.ts', '.tsx'].includes(ext)) return null;
 
       let finalCode = code;
+
+      // Handle experimental RSC boundary detection if enabled
+      if (options.rsc?.enabled) {
+        try {
+          const { RSCCompiler } = require('@ray/react-server');
+          const rscResult = RSCCompiler.compile(finalCode, id, options.rsc);
+          finalCode = rscResult.code;
+        } catch {
+          // Fallback if @ray/react-server is not installed
+        }
+      }
 
       // Detect PascalCase functions or constant definitions (react component candidates)
       const componentNames: string[] = [];
@@ -30,12 +39,14 @@ export function reactPlugin(): RayPlugin {
       }
 
       const uniqueNames = Array.from(new Set(componentNames));
-      if (uniqueNames.length === 0) return null;
+      if (uniqueNames.length === 0) return { code: finalCode };
 
       // Set self-acceptance on dependency node
-      const relativeUrl = '/' + path.relative(this.projectRoot, id).replace(/\\/g, '/');
-      const node = this.graph.registerModule(id, id, relativeUrl);
-      node.isSelfAccepting = true;
+      if (this.projectRoot && this.graph) {
+        const relativeUrl = '/' + path.relative(this.projectRoot, id).replace(/\\/g, '/');
+        const node = this.graph.registerModule(id, id, relativeUrl);
+        node.isSelfAccepting = true;
+      }
 
       // Rewrite const declarations to let so that components can be proxy-rebound
       for (const name of uniqueNames) {
@@ -56,37 +67,7 @@ if (import.meta.hot) {
 }
 `;
 
-      // Intercept and wrap react-dom/client createRoot
-      let createRootWrapper = '';
-      if (finalCode.includes('/@modules/react-dom/client') || finalCode.includes('react-dom/client')) {
-        finalCode = finalCode.replace(
-          /import\s*\{\s*createRoot\s*\}\s*from\s*["']\/@modules\/react-dom\/client["']/g,
-          'import { createRoot as _createRoot } from "/@modules/react-dom/client"'
-        ).replace(
-          /import\s*\{\s*createRoot\s*\}\s*from\s*["']react-dom\/client["']/g,
-          'import { createRoot as _createRoot } from "react-dom/client"'
-        );
-
-        createRootWrapper = `
-const createRoot = (container, options) => {
-  const root = _createRoot(container, options);
-  window.__ray_active_roots.add(root);
-  return {
-    render(element) {
-      window.__ray_root_components.set(root, element);
-      root.render(element);
-    },
-    unmount() {
-      window.__ray_active_roots.delete(root);
-      window.__ray_root_components.delete(root);
-      root.unmount();
-    }
-  };
-};
-`;
-      }
-
-      finalCode = createRootWrapper + '\n' + finalCode + '\n' + proxyInjections + '\n' + hmrAcceptance;
+      finalCode = finalCode + '\n' + proxyInjections + '\n' + hmrAcceptance;
       return { code: finalCode };
     },
   };
