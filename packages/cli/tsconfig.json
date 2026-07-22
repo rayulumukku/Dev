@@ -17,6 +17,7 @@
     { "path": "../test-adapter" },
     { "path": "../test-runner" },
     { "path": "../observability" },
-    { "path": "../inspector" }
+    { "path": "../inspector" },
+    { "path": "../edge-runtime" }
   ]
 }

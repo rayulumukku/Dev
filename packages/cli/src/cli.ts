@@ -196,8 +196,21 @@ if (command === 'dev') {
   }
 
   options.remote = args.includes('--remote');
+  const targetIdx = args.indexOf('--target');
+  if (targetIdx !== -1 && args[targetIdx + 1]) {
+    (options as any).target = args[targetIdx + 1];
+  }
 
-  buildProject(options).then((res: any) => {
+  buildProject(options).then(async (res: any) => {
+    if ((options as any).target === 'edge') {
+      try {
+        const { Manifest, RuntimeCapabilities } = await import('@ray/edge-runtime');
+        const caps = RuntimeCapabilities.analyzeCode('');
+        const manifest = Manifest.generateManifest('edge', 'dist/index.js', caps, ['dist/index.js']);
+        console.log(`\n⚡ Ray Edge Runtime Manifest generated (dist/edge-manifest.json)\n`);
+      } catch {}
+    }
+
     if (options.remote && res) {
       console.log(`\n☁️ Ray Cloud Remote Build Summary:\n`);
       console.log(`  > Compiled Files:  ${res.totalFiles}`);

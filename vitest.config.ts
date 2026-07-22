@@ -30,6 +30,7 @@ export default defineConfig({
       '@ray/test-runner': path.resolve(__dirname, './packages/test-runner/src/index.ts'),
       '@ray/observability': path.resolve(__dirname, './packages/observability/src/index.ts'),
       '@ray/inspector': path.resolve(__dirname, './packages/inspector/src/index.ts'),
+      '@ray/edge-runtime': path.resolve(__dirname, './packages/edge-runtime/src/index.ts'),
     },
   },
   test: {
