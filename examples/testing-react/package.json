@@ -1,0 +1,12 @@
+{
+  "name": "example-testing-react",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "ray test"
+  },
+  "devDependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/test-runner": "^1.0.0"
+  }
+}

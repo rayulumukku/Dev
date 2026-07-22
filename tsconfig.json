@@ -11,6 +11,8 @@
     { "path": "./packages/vscode-extension" },
     { "path": "./packages/framework-runtime" },
     { "path": "./packages/project-graph" },
+    { "path": "./packages/test-adapter" },
+    { "path": "./packages/test-runner" },
     { "path": "./packages/plugin-svelte" },
     { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-angular" },

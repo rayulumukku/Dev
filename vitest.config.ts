@@ -26,6 +26,8 @@ export default defineConfig({
       '@ray/server-actions': path.resolve(__dirname, './packages/server-actions/src/index.ts'),
       '@ray/framework-runtime': path.resolve(__dirname, './packages/framework-runtime/src/index.ts'),
       '@ray/project-graph': path.resolve(__dirname, './packages/project-graph/src/index.ts'),
+      '@ray/test-adapter': path.resolve(__dirname, './packages/test-adapter/src/index.ts'),
+      '@ray/test-runner': path.resolve(__dirname, './packages/test-runner/src/index.ts'),
     },
   },
   test: {

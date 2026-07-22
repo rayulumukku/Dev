@@ -838,6 +838,38 @@ export default defineConfig({
       process.exit(1);
     }
   })();
+} else if (command === 'test') {
+  (async () => {
+    try {
+      const { TestRunner, Reporter } = await import('@ray/test-runner');
+      const watch = args.includes('--watch');
+      const coverage = args.includes('--coverage');
+      const updateSnapshots = args.includes('--update-snapshots');
+      const ui = args.includes('--ui');
+
+      const grepIdx = args.indexOf('--grep');
+      const grep = grepIdx !== -1 && args[grepIdx + 1] ? args[grepIdx + 1] : undefined;
+
+      const reporterIdx = args.indexOf('--reporter');
+      const reporter = reporterIdx !== -1 && args[reporterIdx + 1] ? args[reporterIdx + 1] : 'default';
+
+      console.log(`\n🧪 Running Ray Native Test Suite${ui ? ' (UI Mode)' : ''}...\n`);
+
+      const summary = await TestRunner.run(process.cwd(), {
+        watch,
+        coverage,
+        updateSnapshots,
+        grep,
+        reporter,
+      });
+
+      console.log(Reporter.formatSummary(summary));
+      process.exit(summary.failedCount === 0 ? 0 : 1);
+    } catch (err: any) {
+      console.error('Test execution failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'migrate') {
   (async () => {
     const result = await runMigrateCommand({ cwd: process.cwd() });

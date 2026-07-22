@@ -1,0 +1,20 @@
+{
+  "name": "@ray/test-runner",
+  "version": "1.0.0",
+  "description": "Native Ray testing platform with discovery, execution, watch mode, coverage, snapshots, and reporters",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/test-adapter": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

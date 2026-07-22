@@ -1,0 +1,15 @@
+{
+  "name": "example-testing-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "ray test"
+  },
+  "devDependencies": {
+    "@ray/core": "^1.0.0",
+    "@ray/test-runner": "^1.0.0"
+  }
+}

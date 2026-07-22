@@ -13,6 +13,8 @@
     { "path": "../plugin-sdk" },
     { "path": "../plugin-registry" },
     { "path": "../plugin-manager" },
-    { "path": "../project-graph" }
+    { "path": "../project-graph" },
+    { "path": "../test-adapter" },
+    { "path": "../test-runner" }
   ]
 }

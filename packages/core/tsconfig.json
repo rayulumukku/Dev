@@ -15,6 +15,8 @@
     { "path": "../react-server" },
     { "path": "../server-actions" },
     { "path": "../framework-runtime" },
-    { "path": "../project-graph" }
+    { "path": "../project-graph" },
+    { "path": "../test-adapter" },
+    { "path": "../test-runner" }
   ]
 }
