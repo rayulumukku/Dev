@@ -5,3 +5,4 @@ export * from './DependencyScanner.js';
 export * from './HMR.js';
 export * from './MDXCompiler.js';
 export * from './MDXPlugin.js';
+export { mdx as default } from './MDXPlugin.js';

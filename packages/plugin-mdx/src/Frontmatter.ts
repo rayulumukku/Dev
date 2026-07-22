@@ -14,29 +14,40 @@ export function parseFrontmatter(rawContent: string): FrontmatterResult {
 
   const lines = rawYaml.split(/\r?\n/);
   let currentKey = '';
-  let inList = false;
 
   for (const line of lines) {
-    if (line.trim().startsWith('- ') && currentKey) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (trimmed.startsWith('- ') && currentKey) {
       if (!Array.isArray(data[currentKey])) {
         data[currentKey] = [];
       }
-      data[currentKey].push(line.trim().slice(2).trim());
+      const itemVal = parseYamlValue(trimmed.slice(2).trim());
+      data[currentKey].push(itemVal);
       continue;
     }
 
     const colonIdx = line.indexOf(':');
     if (colonIdx !== -1) {
       const key = line.slice(0, colonIdx).trim();
-      const val = line.slice(colonIdx + 1).trim();
+      const valStr = line.slice(colonIdx + 1).trim();
       currentKey = key;
-      if (val === '') {
+      if (valStr === '') {
         data[key] = [];
       } else {
-        data[key] = val.replace(/^["']|["']$/g, '');
+        data[key] = parseYamlValue(valStr);
       }
     }
   }
 
   return { data, content };
+}
+
+function parseYamlValue(valStr: string): any {
+  if (valStr === 'true') return true;
+  if (valStr === 'false') return false;
+  if (valStr === 'null') return null;
+  if (!isNaN(Number(valStr)) && valStr !== '') return Number(valStr);
+  return valStr.replace(/^["']|["']$/g, '');
 }

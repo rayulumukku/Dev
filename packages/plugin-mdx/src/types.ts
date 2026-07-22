@@ -3,6 +3,7 @@ export interface MDXPluginOptions {
   rehypePlugins?: any[];
   jsxImportSource?: string;
   providerImportSource?: string;
+  filepath?: string;
 }
 
 export interface FrontmatterResult {
@@ -12,6 +13,7 @@ export interface FrontmatterResult {
 
 export interface MDXCompileResult {
   code: string;
+  map?: any;
   frontmatter: Record<string, any>;
   dependencies: string[];
 }

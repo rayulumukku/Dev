@@ -4,8 +4,39 @@ author: Ray Team
 tags:
   - mdx
   - docs
+  - react
 ---
+
+import { Callout } from './components/Callout.tsx';
+import { Counter } from './components/Counter.tsx';
 
 # Welcome to Ray MDX
 
-This document demonstrates MDX compiling directly through Ray's transform pipeline.
+This document demonstrates native MDX compilation directly through Ray's transform pipeline and plugin lifecycle.
+
+![Ray Logo](./assets/logo.svg)
+
+<Callout type="info">
+  This is a custom React component rendered directly inside MDX!
+</Callout>
+
+## Interactive Elements
+
+Here is an interactive stateful component inside MDX:
+
+<Counter />
+
+## Code Example
+
+```typescript
+import { mdx } from '@ray/plugin-mdx';
+
+export default {
+  plugins: [
+    mdx({
+      remarkPlugins: [],
+      rehypePlugins: [],
+    }),
+  ],
+};
+```

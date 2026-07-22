@@ -3,7 +3,9 @@ export function injectMDXHMRCode(code: string): string {
 
 if (import.meta.hot) {
   import.meta.hot.accept((newModule) => {
-    console.log('[Ray MDX HMR] MDX document updated.');
+    if (newModule) {
+      console.log('[Ray MDX HMR] MDX document updated.');
+    }
   });
 }
 `;

@@ -3,6 +3,7 @@
   "references": [
     { "path": "./packages/fs" },
     { "path": "./packages/compiler-rust" },
+    { "path": "./packages/plugin-mdx" },
     { "path": "./packages/core" },
     { "path": "./packages/transform" },
     { "path": "./packages/dev-server" },
