@@ -1,0 +1,19 @@
+{
+  "name": "create-ray-plugin",
+  "version": "1.0.0",
+  "description": "CLI scaffolding tool for official and third-party Ray plugins",
+  "type": "module",
+  "bin": {
+    "create-ray-plugin": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ray/plugin-sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

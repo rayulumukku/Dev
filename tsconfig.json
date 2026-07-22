@@ -3,6 +3,8 @@
   "references": [
     { "path": "./packages/fs" },
     { "path": "./packages/compiler-rust" },
+    { "path": "./packages/plugin-sdk" },
+    { "path": "./packages/create-ray-plugin" },
     { "path": "./packages/plugin-mdx" },
     { "path": "./packages/plugin-analyzer" },
     { "path": "./packages/incremental-build" },

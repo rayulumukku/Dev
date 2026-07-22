@@ -264,6 +264,50 @@ if (command === 'dev') {
       process.exit(1);
     }
   })();
+} else if (command === 'plugin') {
+  const sub = args[1];
+  (async () => {
+    try {
+      const { validatePlugin, generatePluginDocs } = await import('@ray/plugin-sdk');
+      const { RayCore } = await import('@ray/core');
+      const core = new RayCore(process.cwd());
+      await core.init();
+
+      const plugins = core.config.plugins || [];
+
+      if (sub === 'validate') {
+        console.log(`[Ray Plugin SDK] Validating ${plugins.length} active plugin(s)...`);
+        let allValid = true;
+        for (const p of plugins) {
+          const report = validatePlugin(p);
+          if (report.valid) {
+            console.log(`  [✔] Plugin "${report.pluginName}" is valid.`);
+          } else {
+            allValid = false;
+            console.error(`  [❌] Plugin "${report.pluginName}" validation failed: ${report.errors.join(', ')}`);
+          }
+          if (report.warnings.length > 0) {
+            console.warn(`      Warnings: ${report.warnings.join(', ')}`);
+          }
+        }
+        process.exit(allValid ? 0 : 1);
+      } else if (sub === 'docs') {
+        console.log(`[Ray Plugin SDK] Generating plugin documentation...`);
+        for (const p of plugins) {
+          const docs = generatePluginDocs(p);
+          console.log(`\n--- Documentation for ${p.name || 'Plugin'} ---\n`);
+          console.log(docs);
+        }
+        process.exit(0);
+      } else {
+        console.error(`Unknown plugin command: "ray plugin ${sub}". Available: validate, docs`);
+        process.exit(1);
+      }
+    } catch (err: any) {
+      console.error('Plugin command failed:', err.message);
+      process.exit(1);
+    }
+  })();
 } else if (command === 'inspect') {
   (async () => {
     try {
