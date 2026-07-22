@@ -42,7 +42,8 @@
       "@ray/edge-runtime": ["./packages/edge-runtime/src/index.ts"],
       "@ray/deployment": ["./packages/deployment/src/index.ts"],
       "create-deployment-adapter": ["./packages/create-deployment-adapter/src/cli.ts"],
-      "@ray/release": ["./packages/release/src/index.ts"]
+      "@ray/release": ["./packages/release/src/index.ts"],
+      "@ray/api-contract": ["./packages/api-contract/src/index.ts"]
     }
   }
 }

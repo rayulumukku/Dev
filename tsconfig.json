@@ -19,6 +19,7 @@
     { "path": "./packages/deployment" },
     { "path": "./packages/create-deployment-adapter" },
     { "path": "./packages/release" },
+    { "path": "./packages/api-contract" },
     { "path": "./packages/plugin-svelte" },
     { "path": "./packages/plugin-solid" },
     { "path": "./packages/plugin-angular" },

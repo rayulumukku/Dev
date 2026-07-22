@@ -34,6 +34,7 @@ export default defineConfig({
       '@ray/deployment': path.resolve(__dirname, './packages/deployment/src/index.ts'),
       'create-deployment-adapter': path.resolve(__dirname, './packages/create-deployment-adapter/src/cli.ts'),
       '@ray/release': path.resolve(__dirname, './packages/release/src/index.ts'),
+      '@ray/api-contract': path.resolve(__dirname, './packages/api-contract/src/index.ts'),
     },
   },
   test: {

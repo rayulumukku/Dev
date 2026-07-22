@@ -21,6 +21,7 @@
     { "path": "../edge-runtime" },
     { "path": "../deployment" },
     { "path": "../create-deployment-adapter" },
-    { "path": "../release" }
+    { "path": "../release" },
+    { "path": "../api-contract" }
   ]
 }
