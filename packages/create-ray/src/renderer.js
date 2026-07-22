@@ -19,9 +19,16 @@ function copyRecursive(src, dest, context) {
 }
 
 export function renderProject(options) {
-  const { projectName, targetDir, template } = options;
+  const { projectName, targetDir, template, framework, styling } = options;
 
   let chosenTemplate = template;
+  if (!chosenTemplate) {
+    if (styling === 'tailwind') chosenTemplate = 'react-tailwind';
+    else if (framework === 'vue') chosenTemplate = 'vue-ts';
+    else if (framework === 'minimal') chosenTemplate = 'minimal';
+    else chosenTemplate = 'react-ts';
+  }
+
   if (!['react-ts', 'react-tailwind', 'vue-ts', 'minimal'].includes(chosenTemplate)) {
     if (chosenTemplate.includes('vue')) chosenTemplate = 'vue-ts';
     else if (chosenTemplate.includes('tailwind')) chosenTemplate = 'react-tailwind';

@@ -20,9 +20,16 @@ function copyRecursive(src: string, dest: string, context: Record<string, string
 }
 
 export function renderProject(options: ProjectOptions) {
-  const { projectName, targetDir, template } = options;
+  const { projectName, targetDir, template, framework, styling } = options;
 
   let chosenTemplate = template;
+  if (!chosenTemplate) {
+    if (styling === 'tailwind') chosenTemplate = 'react-tailwind';
+    else if (framework === 'vue') chosenTemplate = 'vue-ts';
+    else if (framework === 'minimal') chosenTemplate = 'minimal';
+    else chosenTemplate = 'react-ts';
+  }
+
   if (!['react-ts', 'react-tailwind', 'vue-ts', 'minimal'].includes(chosenTemplate)) {
     if (chosenTemplate.includes('vue')) chosenTemplate = 'vue-ts';
     else if (chosenTemplate.includes('tailwind')) chosenTemplate = 'react-tailwind';
@@ -30,14 +37,12 @@ export function renderProject(options: ProjectOptions) {
     else chosenTemplate = 'react-ts';
   }
 
-  // Find template directory
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const templateDir = path.resolve(currentDir, '../templates', chosenTemplate);
 
   if (fs.existsSync(templateDir)) {
     copyRecursive(templateDir, targetDir, { projectName });
   } else {
-    // Fallback inline generator
     fs.mkdirSync(targetDir, { recursive: true });
     fs.mkdirSync(path.join(targetDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({ name: projectName, version: '1.0.0' }, null, 2));
