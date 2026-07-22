@@ -1,0 +1,21 @@
+{
+  "name": "@ray/benchmark",
+  "version": "1.0.0",
+  "description": "Standalone reproducible benchmarking framework for Ray and external bundlers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "ray-benchmark": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
