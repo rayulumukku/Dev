@@ -34,7 +34,9 @@ export interface RayPlugin {
   configResolved?(config: any): void | Promise<void>;
   resolveId?(this: PluginContext, id: string, importer?: string): Promise<string | null> | string | null;
   load?(this: PluginContext, id: string): Promise<string | null> | string | null;
-  transform?(this: PluginContext, code: string, id: string): Promise<TransformResult | string | null> | TransformResult | string | null;
+  beforeTransform?(this: PluginContext, context: any): Promise<void> | void;
+  transform?(this: PluginContext, code: string, id: string, context?: any): Promise<TransformResult | string | null> | TransformResult | string | null;
+  afterTransform?(this: PluginContext, result: TransformResult, context: any): Promise<TransformResult | void> | TransformResult | void;
   handleHotUpdate?(this: PluginContext, ctx: { file: string; timestamp: number }): Promise<void> | void;
   buildStart?(this: PluginContext): Promise<void>;
   buildEnd?(this: PluginContext): Promise<void>;
@@ -45,6 +47,7 @@ export interface RayPlugin {
   onGraphInvalidated?(this: PluginContext, module: any): Promise<void> | void;
   onGraphUpdated?(this: PluginContext, graph: any): Promise<void> | void;
 }
+
 
 
 export interface LibraryConfig {

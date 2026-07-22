@@ -16,11 +16,21 @@ export interface RayPlugin {
     id: string
   ): Promise<string | null> | string | null;
 
+  // Transform Pipeline Lifecycle Hooks (PR-07)
+  beforeTransform?(this: PluginContext, context: any): Promise<void> | void;
+
   transform?(
     this: PluginContext,
     code: string,
-    id: string
+    id: string,
+    context?: any
   ): Promise<{ code: string; map?: any } | string | null> | { code: string; map?: any } | string | null;
+
+  afterTransform?(
+    this: PluginContext,
+    result: { code: string; map?: any },
+    context: any
+  ): Promise<{ code: string; map?: any } | void> | { code: string; map?: any } | void;
 
   // Graph Lifecycle Hooks (PR-06)
   onModuleDiscovered?(this: PluginContext, module: ModuleNodeInfo): Promise<void> | void;

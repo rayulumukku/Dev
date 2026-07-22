@@ -181,8 +181,9 @@ describe("Ray Native Plugin System (PR-05)", () => {
 
     const container = new PluginContainer([buggyPlugin]);
     await expect(container.transform("code", "file.js")).rejects.toThrowError(
-      /\[Plugin: buggy-plugin\] transform error: Syntax transform error/
+      /\[Plugin: buggy-plugin\] transform error in file\.js: Syntax transform error/
     );
+
   });
 
   it("should provide minimal, safe PluginContext to hooks", async () => {

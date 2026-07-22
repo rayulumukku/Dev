@@ -3,7 +3,9 @@ import { PluginContext, PluginContextOptions } from './PluginContext.js';
 import {
   runResolveId,
   runLoad,
+  runBeforeTransform,
   runTransform,
+  runAfterTransform,
   runModuleDiscovered,
   runDependencyResolved,
   runGraphInvalidated,
@@ -14,6 +16,10 @@ import { ModuleNodeInfo, DependencyEdgeInfo, GraphSnapshotInfo } from '../graph/
 export class PluginContainer {
   private plugins: RayPlugin[] = [];
   private context: PluginContext;
+
+  private hasBeforeTransform = false;
+  private hasTransform = false;
+  private hasAfterTransform = false;
 
   private hasModuleDiscovered = false;
   private hasDependencyResolved = false;
@@ -66,6 +72,10 @@ export class PluginContainer {
   }
 
   private updateHookFlags(): void {
+    this.hasBeforeTransform = this.plugins.some((p) => typeof p.beforeTransform === 'function');
+    this.hasTransform = this.plugins.some((p) => typeof p.transform === 'function');
+    this.hasAfterTransform = this.plugins.some((p) => typeof p.afterTransform === 'function');
+
     this.hasModuleDiscovered = this.plugins.some((p) => typeof p.onModuleDiscovered === 'function');
     this.hasDependencyResolved = this.plugins.some((p) => typeof p.onDependencyResolved === 'function');
     this.hasGraphInvalidated = this.plugins.some((p) => typeof p.onGraphInvalidated === 'function');
@@ -80,6 +90,10 @@ export class PluginContainer {
     return this.context;
   }
 
+  hasTransformHooks(): boolean {
+    return this.hasBeforeTransform || this.hasTransform || this.hasAfterTransform;
+  }
+
   async resolveId(id: string, importer?: string): Promise<string | null> {
     return runResolveId(this.plugins, id, importer, this.context);
   }
@@ -88,8 +102,18 @@ export class PluginContainer {
     return runLoad(this.plugins, id, this.context);
   }
 
-  async transform(code: string, id: string): Promise<{ code: string; map?: any }> {
-    return runTransform(this.plugins, code, id, this.context);
+  async beforeTransform(transformContext: any): Promise<void> {
+    if (!this.hasBeforeTransform) return;
+    return runBeforeTransform(this.plugins, transformContext, this.context);
+  }
+
+  async transform(code: string, id: string, transformContext?: any): Promise<{ code: string; map?: any }> {
+    return runTransform(this.plugins, code, id, this.context, transformContext);
+  }
+
+  async afterTransform(result: { code: string; map?: any }, transformContext: any): Promise<{ code: string; map?: any }> {
+    if (!this.hasAfterTransform) return result;
+    return runAfterTransform(this.plugins, result, transformContext, this.context);
   }
 
   // Graph Lifecycle Methods (PR-06)

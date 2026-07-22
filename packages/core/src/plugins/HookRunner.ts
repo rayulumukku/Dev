@@ -16,7 +16,7 @@ export async function runResolveId(
           return typeof res === 'string' ? res : null;
         }
       } catch (err: any) {
-        throw new Error(`[Plugin: ${plugin.name}] resolveId error: ${err.message || String(err)}`);
+        throw new Error(`[Plugin: ${plugin.name}] resolveId error in ${id}: ${err.message || String(err)}`);
       }
     }
   }
@@ -36,18 +36,36 @@ export async function runLoad(
           return typeof res === 'string' ? res : null;
         }
       } catch (err: any) {
-        throw new Error(`[Plugin: ${plugin.name}] load error: ${err.message || String(err)}`);
+        throw new Error(`[Plugin: ${plugin.name}] load error in ${id}: ${err.message || String(err)}`);
       }
     }
   }
   return null;
 }
 
+export async function runBeforeTransform(
+  plugins: RayPlugin[],
+  transformContext: any,
+  context?: PluginContext
+): Promise<void> {
+  for (const plugin of plugins) {
+    if (plugin.beforeTransform) {
+      try {
+        await plugin.beforeTransform.call(context as PluginContext, transformContext);
+      } catch (err: any) {
+        const filename = transformContext?.filename || 'unknown';
+        throw new Error(`[Plugin: ${plugin.name}] beforeTransform error in ${filename}: ${err.message || String(err)}`);
+      }
+    }
+  }
+}
+
 export async function runTransform(
   plugins: RayPlugin[],
   code: string,
   id: string,
-  context?: PluginContext
+  context?: PluginContext,
+  transformContext?: any
 ): Promise<{ code: string; map?: any }> {
   let currentCode = code;
   let currentMap: any = undefined;
@@ -55,7 +73,7 @@ export async function runTransform(
   for (const plugin of plugins) {
     if (plugin.transform) {
       try {
-        const res = await plugin.transform.call(context as PluginContext, currentCode, id);
+        const res = await plugin.transform.call(context as PluginContext, currentCode, id, transformContext);
         if (res !== null && res !== undefined) {
           if (typeof res === 'string') {
             currentCode = res;
@@ -69,12 +87,40 @@ export async function runTransform(
           }
         }
       } catch (err: any) {
-        throw new Error(`[Plugin: ${plugin.name}] transform error: ${err.message || String(err)}`);
+        throw new Error(`[Plugin: ${plugin.name}] transform error in ${id}: ${err.message || String(err)}`);
       }
     }
   }
 
   return { code: currentCode, map: currentMap };
+}
+
+export async function runAfterTransform(
+  plugins: RayPlugin[],
+  result: { code: string; map?: any },
+  transformContext: any,
+  context?: PluginContext
+): Promise<{ code: string; map?: any }> {
+  let currentResult = { ...result };
+
+  for (const plugin of plugins) {
+    if (plugin.afterTransform) {
+      try {
+        const res = await plugin.afterTransform.call(context as PluginContext, currentResult, transformContext);
+        if (res && typeof res === 'object' && res.code !== undefined) {
+          currentResult = {
+            code: res.code,
+            map: res.map !== undefined ? res.map : currentResult.map,
+          };
+        }
+      } catch (err: any) {
+        const filename = transformContext?.filename || 'unknown';
+        throw new Error(`[Plugin: ${plugin.name}] afterTransform error in ${filename}: ${err.message || String(err)}`);
+      }
+    }
+  }
+
+  return currentResult;
 }
 
 export async function runModuleDiscovered(
