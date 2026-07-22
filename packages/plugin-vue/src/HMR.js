@@ -6,6 +6,6 @@ export * from './hmr/boundary.js';
 export * from './hmr/updateHandler.js';
 export * from './hmr/accept.js';
 
-export function generateVueHMR(filename: string, updateType: string = 'multiple'): string {
+export function generateVueHMR(filename, updateType = 'multiple') {
   return generateVueHMRAccept(filename, updateType);
 }

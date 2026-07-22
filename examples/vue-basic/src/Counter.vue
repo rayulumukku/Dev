@@ -1,31 +1,39 @@
 <template>
-  <div class="counter">
-    <p>Count: {{ count }}</p>
-    <button @click="increment">Increment</button>
+  <div class="counter-card">
+    <h3>{{ title }}</h3>
+    <p>Count: {{ count }} (Double: {{ doubleCount }})</p>
+    <div class="actions">
+      <button @click="increment">+</button>
+      <button @click="decrement">-</button>
+    </div>
   </div>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      count: 0,
-    };
+<script setup>
+import { defineProps, defineEmits } from 'vue';
+import { useCounter } from './useCounter';
+
+const props = defineProps({
+  title: {
+    type: String,
+    default: 'Interactive Counter',
   },
-  methods: {
-    increment() {
-      this.count++;
-    },
-  },
-};
+});
+
+const emit = defineEmits(['change']);
+
+const { count, doubleCount, increment, decrement } = useCounter(0);
 </script>
 
 <style>
-.counter {
-  margin-top: 10px;
+.counter-card {
+  border: 1px solid #ccc;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 12px;
 }
-button {
-  padding: 8px 16px;
-  cursor: pointer;
+.actions button {
+  margin-right: 8px;
+  padding: 6px 12px;
 }
 </style>

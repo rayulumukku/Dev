@@ -1,24 +1,22 @@
-import { RayPlugin } from '@ray/core';
-import { VuePluginOptions } from './types.js';
 import { parseSFC } from './SFCParser.js';
 import { compileSFC } from './SFCCompiler.js';
 import { resolveVueId } from './VueResolver.js';
 import { generateVueHMR } from './HMR.js';
 import { globalDescriptorCache } from './hmr/descriptorCache.js';
 
-export function vuePlugin(options: VuePluginOptions = {}): RayPlugin {
+export function vuePlugin(options = {}) {
   return {
     name: '@ray/plugin-vue',
 
-    resolveId(id: string, importer?: string) {
+    resolveId(id, importer) {
       return resolveVueId(id, importer);
     },
 
-    load(id: string) {
+    load(id) {
       return null;
     },
 
-    transform(code: string, id: string) {
+    transform(code, id) {
       if (!id.endsWith('.vue')) return null;
 
       const descriptor = parseSFC(code, id);
