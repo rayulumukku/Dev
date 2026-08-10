@@ -1825,7 +1825,7 @@ export class Parser {
     const body = this.parseBlockStatement();
 
     return {
-      type: NodeType.FunctionDeclaration,
+      type: NodeType.FunctionExpression,
       async: isAsync,
       generator: isGenerator,
       id: id || { type: NodeType.Identifier, name: '' },

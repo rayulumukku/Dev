@@ -9,6 +9,7 @@ export enum NodeType {
   VariableDeclaration = 'VariableDeclaration',
   VariableDeclarator = 'VariableDeclarator',
   FunctionDeclaration = 'FunctionDeclaration',
+  FunctionExpression = 'FunctionExpression',
   ClassDeclaration = 'ClassDeclaration',
   ClassBody = 'ClassBody',
   MethodDefinition = 'MethodDefinition',

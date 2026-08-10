@@ -214,6 +214,7 @@ export class CodeGenerator {
       }
 
       // ── Functions ──────────────────────────────────────────────────────
+      case NodeType.FunctionExpression:
       case NodeType.FunctionDeclaration: {
         const asyncPrefix = node.async ? `async${s}` : '';
         const genStar = node.generator ? '*' : '';

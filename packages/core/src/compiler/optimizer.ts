@@ -52,8 +52,8 @@ export class Optimizer {
       return node;
     }
 
-    if (node.type === NodeType.FunctionDeclaration) {
-      if (parentType !== NodeType.ExportNamedDeclaration && node.id?.name) {
+    if (node.type === NodeType.FunctionDeclaration || node.type === NodeType.ArrowFunctionExpression) {
+      if (node.type === NodeType.FunctionDeclaration && node.id && node.id.name) {
         const binding = currentScope.getBinding(node.id.name);
         if (binding && binding.referencesCount === 0) {
           console.log(`[Ray Tree Shaking] Pruned unreferenced function: ${node.id.name}`);
