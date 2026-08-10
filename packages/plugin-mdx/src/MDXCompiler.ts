@@ -64,6 +64,9 @@ export async function compileMDX(
   if (mdxJsxCode) {
     // Integrate @mdx-js/mdx output with frontmatter exports & HMR
     finalCode = mdxJsxCode;
+    if (!finalCode.includes("import React")) {
+      finalCode = `import React from 'react';\n` + finalCode;
+    }
     finalCode += formatFrontmatterExports(frontmatterData);
     finalCode = injectMDXHMRCode(finalCode);
   } else {

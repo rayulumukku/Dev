@@ -28,7 +28,7 @@ export class Optimizer {
     if (node.type === NodeType.VariableDeclaration) {
       node.declarations = node.declarations
         .map((decl: any) => {
-          if (parentType !== NodeType.ExportNamedDeclaration && decl.id.type === NodeType.Identifier) {
+          if (parentType !== NodeType.ExportNamedDeclaration && parentType !== NodeType.ExportDefaultDeclaration && decl.id.type === NodeType.Identifier) {
             const binding = currentScope.getBinding(decl.id.name);
             if (binding && binding.referencesCount === 0) {
               console.log(`[Ray Tree Shaking] Pruned unreferenced variable: ${decl.id.name}`);
@@ -54,10 +54,12 @@ export class Optimizer {
 
     if (node.type === NodeType.FunctionDeclaration || node.type === NodeType.ArrowFunctionExpression) {
       if (node.type === NodeType.FunctionDeclaration && node.id && node.id.name) {
-        const binding = currentScope.getBinding(node.id.name);
-        if (binding && binding.referencesCount === 0) {
-          console.log(`[Ray Tree Shaking] Pruned unreferenced function: ${node.id.name}`);
-          return null as any;
+        if (parentType !== NodeType.ExportNamedDeclaration && parentType !== NodeType.ExportDefaultDeclaration) {
+          const binding = currentScope.getBinding(node.id.name);
+          if (binding && binding.referencesCount === 0) {
+            console.log(`[Ray Tree Shaking] Pruned unreferenced function: ${node.id.name}`);
+            return null as any;
+          }
         }
       }
 
@@ -73,7 +75,7 @@ export class Optimizer {
     }
 
     if (node.type === NodeType.ClassDeclaration) {
-      if (parentType !== NodeType.ExportNamedDeclaration && node.id?.name) {
+      if (parentType !== NodeType.ExportNamedDeclaration && parentType !== NodeType.ExportDefaultDeclaration && node.id?.name) {
         const binding = currentScope.getBinding(node.id.name);
         if (binding && binding.referencesCount === 0) {
           console.log(`[Ray Tree Shaking] Pruned unreferenced class: ${node.id.name}`);

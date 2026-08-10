@@ -15,7 +15,8 @@ export function mdxPlugin(options: any = {}): RayPlugin {
         const mod = await import('@ray/plugin-mdx');
         const plugin = (mod.mdx || mod.default)(options);
         return plugin.transform.call(this, code, id);
-      } catch {
+      } catch (err: any) {
+        console.error('[MDX Plugin Error]', err);
         return null;
       }
     },

@@ -16,6 +16,7 @@ interface DevServerOptions {
   port: number;
   ssr?: boolean;
   mode?: string;
+  root?: string;
 }
 
 let lastRenderTime = 0;
@@ -38,10 +39,10 @@ const MIME_TYPES: Record<string, string> = {
  * Refactored to coordinate compiles and resolutions entirely via RayCore plugins.
  */
 export async function startDevServer(options: DevServerOptions) {
-  const { port } = options;
+  const { port, root } = options;
   const isPreview = !!(options as any).preview;
 
-  let projectRoot = process.cwd();
+  let projectRoot = root || process.cwd();
   if (isPreview) {
     try {
       const stats = await fs.stat(path.join(process.cwd(), 'dist/client'));

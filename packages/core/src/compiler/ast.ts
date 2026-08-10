@@ -24,6 +24,7 @@ export enum NodeType {
   ImportExpression = 'ImportExpression',
   ImportAttribute = 'ImportAttribute',
   ExportNamedDeclaration = 'ExportNamedDeclaration',
+  ExportDefaultDeclaration = 'ExportDefaultDeclaration',
   ExportAllDeclaration = 'ExportAllDeclaration',
   ExportSpecifier = 'ExportSpecifier',
 

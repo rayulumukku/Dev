@@ -184,7 +184,7 @@ export class Lexer {
       }
 
       // ── JSX specific: closing tag ──
-      if (char === '<' && this.peekAt(1) === '/' && /[a-zA-Z_]/.test(this.peekAt(2) || '')) {
+      if (char === '<' && this.peekAt(1) === '/' && /[a-zA-Z_>]/.test(this.peekAt(2) || '')) {
         let tagVal = this.advance(); // <
         tagVal += this.advance(); // /
         while (this.index < this.length && /[a-zA-Z0-9_\-\.]/.test(this.peek())) {
@@ -203,7 +203,7 @@ export class Lexer {
       }
 
       // ── JSX specific: opening tag ──
-      if (char === '<' && /[a-zA-Z_]/.test(this.peekAt(1) || '')) {
+      if (char === '<' && /[a-zA-Z_>]/.test(this.peekAt(1) || '')) {
         // If preceded by an identifier or certain keywords (except return, default, yield, throw),
         // it's likely a generic parameter list or comparison, not JSX.
         const skipJSX = lastToken && (
@@ -224,7 +224,8 @@ export class Lexer {
       }
 
       // ── Regex Literal ──
-      if (char === '/' && !this.canPrecedeDivision(lastToken)) {
+      const isJSXTag = this.contextStack[this.contextStack.length - 1] === 'jsx-tag';
+      if (char === '/' && !this.canPrecedeDivision(lastToken) && !isJSXTag) {
         const tok = this.readRegex(startLine, startColumn);
         if (tok) {
           tokens.push(tok);

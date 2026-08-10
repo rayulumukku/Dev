@@ -127,7 +127,7 @@ export class CodeGenerator {
         const attrStr = this.generateImportAttributes(node.attributes);
 
         if (specs.length === 0) {
-          return this.emit(`import${s}${srcStr}${attrStr};`);
+          return this.emit(`import ${srcStr}${attrStr};`);
         }
 
         const defaultSpec = specs.find((s: any) => s.type === NodeType.ImportDefaultSpecifier);
@@ -140,18 +140,18 @@ export class CodeGenerator {
           if (nsSpec || namedSpecs.length > 0) importsPart += `,${s}`;
         }
         if (nsSpec) {
-          importsPart += `*${s}as${s}${this.generate(nsSpec.local)}`;
+          importsPart += `*${s}as ${this.generate(nsSpec.local)}`;
         }
         if (namedSpecs.length > 0) {
           const specParts = namedSpecs.map((spec: any) => {
             const imported = this.generate(spec.imported);
             const local = this.generate(spec.local);
-            return imported === local ? imported : `${imported}${s}as${s}${local}`;
+            return imported === local ? imported : `${imported} as ${local}`;
           }).join(`,${s}`);
           importsPart += `{${s}${specParts}${s}}`;
         }
 
-        return this.emit(`import${s}${importsPart}${s}from${s}${srcStr}${attrStr};`);
+        return this.emit(`import ${importsPart} from ${srcStr}${attrStr};`);
       }
 
       case NodeType.ImportExpression: {
@@ -177,7 +177,7 @@ export class CodeGenerator {
           return this.emit(`export${s}{${s}${specs}${s}}${src}${attrStr};`);
         }
         if (node.declaration) {
-          const prefix = node.isDefault ? `export${s}default${s}` : `export${s}`;
+          const prefix = node.isDefault ? `export default ` : `export `;
           const decl = this.generate(node.declaration);
           // Don't add extra semicolon if declaration already ends with }
           const needsSemicolon = node.isDefault && !decl.trimEnd().endsWith('}');
@@ -198,7 +198,7 @@ export class CodeGenerator {
       // ── Variable Declarations ──────────────────────────────────────────
       case NodeType.VariableDeclaration: {
         const decls = node.declarations.map((d: any) => this.generate(d)).join(`,${s}`);
-        return this.emit(`${node.kind}${s}${decls};`);
+        return this.emit(`${node.kind} ${decls};`);
       }
 
       case NodeType.VariableDeclarator: {
@@ -216,12 +216,13 @@ export class CodeGenerator {
       // ── Functions ──────────────────────────────────────────────────────
       case NodeType.FunctionExpression:
       case NodeType.FunctionDeclaration: {
-        const asyncPrefix = node.async ? `async${s}` : '';
+        const asyncPrefix = node.async ? `async ` : '';
         const genStar = node.generator ? '*' : '';
-        const id = node.id ? this.generate(node.id) : '';
+        const id = node.id ? (this.minified ? ` ${this.generate(node.id)}` : ` ${this.generate(node.id)}`) : '';
         const params = node.params.map((p: any) => this.generate(p)).join(`,${s}`);
         const body = this.generate(node.body);
-        return this.emit(`${asyncPrefix}function${genStar}${s}${id}(${params})${s}${body}`);
+        const spaceBeforeParen = (!node.id && !this.minified) ? ' ' : '';
+        return this.emit(`${asyncPrefix}function${genStar}${id}${spaceBeforeParen}(${params})${s}${body}`);
       }
 
       case NodeType.ArrowFunctionExpression: {
@@ -244,8 +245,8 @@ export class CodeGenerator {
           }
         }
         out += 'class';
-        if (node.id && node.id.name) out += `${s}${this.generate(node.id)}`;
-        if (node.superClass) out += `${s}extends${s}${this.generate(node.superClass)}`;
+        if (node.id && node.id.name) out += ` ${this.generate(node.id)}`;
+        if (node.superClass) out += ` extends ${this.generate(node.superClass)}`;
         out += `${s}${this.generate(node.body)}`;
         return this.emit(out);
       }
@@ -454,7 +455,7 @@ export class CodeGenerator {
 
       case NodeType.CallExpression: {
         let callee = this.generate(node.callee);
-        if ([NodeType.FunctionDeclaration, NodeType.ArrowFunctionExpression, NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.callee.type)) {
+        if ([NodeType.FunctionDeclaration, NodeType.FunctionExpression, NodeType.ArrowFunctionExpression, NodeType.ConditionalExpression, NodeType.LogicalExpression, NodeType.BinaryExpression, NodeType.AssignmentExpression].includes(node.callee.type)) {
           callee = `(${callee})`;
         }
         const args = node.arguments.map((arg: any) => this.generate(arg)).join(`,${s}`);

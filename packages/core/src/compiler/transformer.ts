@@ -399,11 +399,30 @@ export class Transformer {
   private transformJSX(node: ASTNode): ASTNode {
     const opening = node.openingElement;
     const tag = opening.name.name;
-    const isHtmlTag = tag[0] === tag[0].toLowerCase();
-
-    const tagExpr = isHtmlTag
-      ? { type: NodeType.Literal, value: tag, raw: `"${tag}"` }
-      : { type: NodeType.Identifier, name: tag };
+    
+    let tagExpr: ASTNode;
+    if (tag === '') {
+      tagExpr = { type: NodeType.MemberExpression, object: { type: NodeType.Identifier, name: 'React' }, property: { type: NodeType.Identifier, name: 'Fragment' }, computed: false };
+    } else {
+      const isHtmlTag = /^[a-z]/.test(tag) && !tag.includes('.');
+      if (isHtmlTag) {
+        tagExpr = { type: NodeType.Literal, value: tag, raw: `"${tag}"` };
+      } else if (tag.includes('.')) {
+        const parts = tag.split('.');
+        let expr: ASTNode = { type: NodeType.Identifier, name: parts[0] };
+        for (let i = 1; i < parts.length; i++) {
+          expr = {
+            type: NodeType.MemberExpression,
+            object: expr,
+            property: { type: NodeType.Identifier, name: parts[i] },
+            computed: false
+          };
+        }
+        tagExpr = expr;
+      } else {
+        tagExpr = { type: NodeType.Identifier, name: tag };
+      }
+    }
 
     // Build props from attributes
     const propsEntries: ASTNode[] = [];

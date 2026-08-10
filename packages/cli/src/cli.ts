@@ -17,6 +17,11 @@ if (modeIdx !== -1 && args[modeIdx + 1]) {
 }
 
 if (command === 'dev') {
+  let root = process.cwd();
+  if (args[1] && !args[1].startsWith('--')) {
+    root = path.resolve(process.cwd(), args[1]);
+  }
+
   let port = 3000;
 
   // Simple parser to check for "--port <number>" flag
@@ -30,8 +35,13 @@ if (command === 'dev') {
 
   const ssr = args.includes('--ssr');
   const rsc = args.includes('--rsc');
-  startDevServer({ port, ssr, rsc, mode } as any);
+  startDevServer({ root, port, ssr, rsc, mode } as any);
 } else if (command === 'studio') {
+  let root = process.cwd();
+  if (args[1] && !args[1].startsWith('--')) {
+    root = path.resolve(process.cwd(), args[1]);
+  }
+
   let port = 3000;
   const portIdx = args.indexOf('--port');
   if (portIdx !== -1 && args[portIdx + 1]) {
@@ -44,7 +54,7 @@ if (command === 'dev') {
   (async () => {
     try {
       console.log(`[Ray Studio] Launching visual developer dashboard on port ${port}...`);
-      await startDevServer({ port, ssr: false, mode });
+      await startDevServer({ root, port, ssr: false, mode });
 
       const studioUrl = `http://localhost:${port}/__ray/studio`;
       try {
