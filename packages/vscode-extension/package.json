@@ -1,6 +1,7 @@
 {
   "name": "@ray/vscode-extension",
   "version": "1.0.0",
+  "type": "module",
   "description": "Official Ray VS Code extension providing IntelliSense, diagnostics, snippets, and project commands",
   "publisher": "ray",
   "main": "./dist/extension.js",

@@ -43,35 +43,8 @@ export async function compileMDX(
     }
   }
 
-  // 3. Attempt to use @mdx-js/mdx compile if available
-  let mdxJsxCode: string | null = null;
-  try {
-    const { compile } = await import('@mdx-js/mdx');
-    const vfile = await compile(processedBody, {
-      remarkPlugins,
-      rehypePlugins,
-      jsx: true,
-      jsxImportSource: options.jsxImportSource || 'react',
-      providerImportSource: options.providerImportSource,
-    });
-    mdxJsxCode = String(vfile.value);
-  } catch {
-    // Fall back to built-in MDX-to-JSX compiler pipeline
-  }
-
-  let finalCode = '';
-
-  if (mdxJsxCode) {
-    // Integrate @mdx-js/mdx output with frontmatter exports & HMR
-    finalCode = mdxJsxCode;
-    if (!finalCode.includes("import React")) {
-      finalCode = `import React from 'react';\n` + finalCode;
-    }
-    finalCode += formatFrontmatterExports(frontmatterData);
-    finalCode = injectMDXHMRCode(finalCode);
-  } else {
-    // Built-in MDX to JSX compiler
-    const lines = processedBody.split(/\r?\n/);
+  // 3. Built-in MDX to JSX compiler
+  const lines = processedBody.split(/\r?\n/);
     const topImports: string[] = [];
     const bodyLines: string[] = [];
     let inCodeBlock = false;
@@ -164,9 +137,7 @@ export async function compileMDX(
     jsxCode += formatFrontmatterExports(frontmatterData);
     jsxCode += `\nexport default function MDXContent(props) {\n  return (\n    <div className="mdx-content" {...props}>\n      ${bodyLines.join('\n      ')}\n    </div>\n  );\n}\n`;
 
-    jsxCode = injectMDXHMRCode(jsxCode);
-    finalCode = jsxCode;
-  }
+    const finalCode = injectMDXHMRCode(jsxCode);
 
   // 4. Source maps
   const sourcemap = {
