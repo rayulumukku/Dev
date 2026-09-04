@@ -28,6 +28,16 @@ describe('Full create-ray Scaffolding Engine (PR-15)', () => {
     expect(validateProjectName('').valid).toBe(false);
   });
 
+  it('should reject profane and vulgar project names', () => {
+    const profane1 = validateProjectName('fuck-app');
+    expect(profane1.valid).toBe(false);
+    expect(profane1.error).toContain('contains inappropriate or offensive language');
+
+    const profane2 = validateProjectName('asshole-project');
+    expect(profane2.valid).toBe(false);
+    expect(profane2.error).toContain('contains inappropriate or offensive language');
+  });
+
   it('should detect package manager from environment', () => {
     expect(detectPackageManager({ npm_config_user_agent: 'pnpm/8.0.0 node/v20.0.0' })).toBe('pnpm');
     expect(detectPackageManager({ npm_config_user_agent: 'yarn/1.22.0' })).toBe('yarn');

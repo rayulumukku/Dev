@@ -1,9 +1,27 @@
 import fs from 'fs';
 import { ValidationResult } from './types.js';
+import {
+  RegExpMatcher,
+  englishDataset,
+  englishRecommendedTransformers,
+} from 'obscenity';
+
+const profanityMatcher = new RegExpMatcher({
+  ...englishDataset.build(),
+  ...englishRecommendedTransformers,
+});
+
+export function isProfane(text: string): boolean {
+  if (!text) return false;
+  return profanityMatcher.hasMatch(text);
+}
 
 export function validateProjectName(name: string): ValidationResult {
   if (!name || name.trim() === '') {
     return { valid: false, error: 'Project name cannot be empty.' };
+  }
+  if (isProfane(name)) {
+    return { valid: false, error: `Project name "${name}" contains inappropriate or offensive language.` };
   }
   if (!/^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(name)) {
     return { valid: false, error: `Invalid project name "${name}". Must be lowercase npm package name.` };

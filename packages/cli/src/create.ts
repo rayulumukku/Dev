@@ -1,10 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import { hasObscenity } from '@ray/core';
 
 export function runCreateProject(projectRoot: string, name: string, template: string) {
   const isDotPath = name === '.';
   const targetDir = isDotPath ? projectRoot : path.resolve(projectRoot, name);
   const projectName = isDotPath ? path.basename(targetDir) : name;
+
+  if (hasObscenity(projectName)) {
+    throw new Error(`Project name "${projectName}" contains inappropriate or offensive language.`);
+  }
 
   console.log(`\n⚡ [Ray Create] Scaffolding new Ray project: "${projectName}" using template "${template}" at ${targetDir}...`);
 

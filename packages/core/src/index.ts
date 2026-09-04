@@ -112,6 +112,9 @@ export { CompilerSuggestions } from './ai/compilerSuggestions.js';
 export { StaticPerformanceAnalyzer } from './ai/staticPerformanceAnalyzer.js';
 
 
+// ─── Content Moderation & Obscenity Filtering ───────────────────────────
+export { hasObscenity, censorObscenity } from './utils/obscenity.js';
+
 export class RayCore {
   resolver: Resolver;
   graph: DependencyGraph;

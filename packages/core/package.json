@@ -10,6 +10,7 @@
   "dependencies": {
     "@ray/compiler-rust": "*",
     "@ray/transform": "*",
-    "es-module-lexer": "^1.4.1"
+    "es-module-lexer": "^1.4.1",
+    "obscenity": "^0.4.6"
   }
 }

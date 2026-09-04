@@ -19,6 +19,7 @@ export { ModuleNode } from './graph/moduleNode.js';
 export { buildProject } from './build/index.js';
 export { PluginContainer } from './plugin/container.js';
 export { runOptimizer } from './optimizer/index.js';
+export { hasObscenity, censorObscenity } from './utils/obscenity.js';
 import { reactPlugin } from './plugin/official/react.js';
 import { svgPlugin } from './plugin/official/svg.js';
 import { mdxPlugin } from './plugin/official/mdx.js';
