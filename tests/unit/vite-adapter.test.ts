@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { ViteAdapter } from '../../packages/benchmark/src/adapters/ViteAdapter.js';
 import { setupViteProject } from '../../packages/benchmark/src/adapters/ViteProject.js';
 import { validateViteSetup } from '../../packages/benchmark/src/adapters/ViteValidator.js';
 import { globalRunner } from '../../packages/benchmark/src/Runner.js';
 
-const testTmpDir = path.resolve(process.cwd(), 'temp-vite-adapter-test');
+const testTmpDir = path.resolve(os.tmpdir(), 'ray-temp-vite-adapter-test');
 
 function safeRmDir(dir: string) {
   if (fs.existsSync(dir)) {

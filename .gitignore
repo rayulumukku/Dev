@@ -13,3 +13,4 @@ benchmark-report.html
 benchmark-report.json
 library-report.json
 build-report.json
+temp-vite-adapter-test/
