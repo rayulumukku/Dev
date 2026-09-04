@@ -9,6 +9,11 @@ import { runMigrateCommand } from './commands/migrate.js';
 const args = process.argv.slice(2);
 const command = args[0];
 
+if (command === '--version' || command === '-v') {
+  console.log('Ray v1.0.0');
+  process.exit(0);
+}
+
 // Resolve mode override flag
 let mode = 'development';
 const modeIdx = args.indexOf('--mode');
@@ -1058,8 +1063,12 @@ export default defineConfig({
     process.exit(result.exitCode);
   })();
 } else {
+  const isHelp = !command || command === '--help' || command === '-h' || command === 'help';
+  if (!isHelp) {
+    console.error(`\n❌ Unknown command: "${command}"\nRun "ray --help" to view all available commands.`);
+  }
   console.log(`
- ⚡ Ray CLI (Milestone 18 - Ray Cloud Distributed Compiler Platform) ⚡
+ ⚡ Ray CLI v1.0.0 (High-Performance Modern Frontend Build Platform) ⚡
 
 Usage:
   ray dev             Start the live dev server
@@ -1074,6 +1083,8 @@ Usage:
   ray create <name>   Scaffold a new project (templates: react, react-ts, react-ssr, library)
   ray migrate         Detect and migrate Vite or Webpack projects to Ray
   ray verify          Perform full project diagnostic checks
+  ray doctor          Run health and diagnostic checks on system environment
+  ray benchmark       Benchmark performance against other bundlers
   ray release         Publish automation pipeline (bumping version, changelog, tagging)
   ray cache info      Display compiler cache usage details
   ray cache clean     Delete persistent compiler cache directory
@@ -1094,5 +1105,5 @@ Options for build:
   --watch             Incrementally watch and rebuild on changes
   --analyze           Print visual bundle file analysis report
 `);
-  process.exit(1);
+  process.exit(isHelp ? 0 : 1);
 }

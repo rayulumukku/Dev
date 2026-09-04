@@ -34,6 +34,16 @@
     { "path": "./packages/hmr-runtime" },
     { "path": "./packages/migrate" },
     { "path": "./packages/plugin-compat" },
-    { "path": "./packages/cli" }
+    { "path": "./packages/cli" },
+    { "path": "./packages/benchmark" },
+    { "path": "./packages/cache" },
+    { "path": "./packages/create-ray" },
+    { "path": "./packages/graph-inspector" },
+    { "path": "./packages/plugin-css" },
+    { "path": "./packages/plugin-vue" },
+    { "path": "./packages/remote-cache" },
+    { "path": "./packages/ssg" },
+    { "path": "./packages/ssr" },
+    { "path": "./packages/workspace" }
   ]
 }

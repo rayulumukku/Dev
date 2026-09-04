@@ -40,6 +40,7 @@ const MIME_TYPES: Record<string, string> = {
  */
 export async function startDevServer(options: DevServerOptions) {
   const { port, root } = options;
+  let currentPort = port;
   const isPreview = !!(options as any).preview;
 
   let projectRoot = root || process.cwd();
@@ -71,7 +72,7 @@ export async function startDevServer(options: DevServerOptions) {
       return;
     }
 
-    const url = new URL(req.url || '/', `http://localhost:${port}`);
+    const url = new URL(req.url || '/', `http://localhost:${currentPort}`);
     const pathname = decodeURIComponent(url.pathname);
 
     // Bypasses execution compile pipeline if serving compiled static production builds
@@ -620,18 +621,28 @@ export async function startDevServer(options: DevServerOptions) {
         },
       });
 
-  // 5. Listen on specified port
-  server.listen(port, () => {
-    console.log(`\n  ⚡ Ray Server (Mode: ${isPreview ? 'Preview' : 'Dev'}) ⚡\n`);
-    console.log(`  > Local:       http://localhost:${port}/`);
-    if (!isPreview) {
-      console.log(`  > Diagnostics: http://localhost:${port}/__ray/graph`);
-      console.log(`  > WebSocket:   http://localhost:${port}/__ray/ws`);
-      console.log(`  > CSS Status:  http://localhost:${port}/__ray/css`);
-      console.log(`  > HMR Status:  http://localhost:${port}/__ray/hmr`);
-      console.log(`  > Plugins:     http://localhost:${port}/__ray/plugins`);
+  // 5. Listen on specified port with automatic fallback on EADDRINUSE
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[Ray Server] Port ${currentPort} is in use, trying port ${currentPort + 1}...`);
+      currentPort++;
+      server.listen(currentPort);
+    } else {
+      console.error('[Ray Server Error]', err);
     }
-    console.log(`  > SSR Status:  http://localhost:${port}/__ray/ssr`);
+  });
+
+  server.listen(currentPort, () => {
+    console.log(`\n  ⚡ Ray Server (Mode: ${isPreview ? 'Preview' : 'Dev'}) ⚡\n`);
+    console.log(`  > Local:       http://localhost:${currentPort}/`);
+    if (!isPreview) {
+      console.log(`  > Diagnostics: http://localhost:${currentPort}/__ray/graph`);
+      console.log(`  > WebSocket:   http://localhost:${currentPort}/__ray/ws`);
+      console.log(`  > CSS Status:  http://localhost:${currentPort}/__ray/css`);
+      console.log(`  > HMR Status:  http://localhost:${currentPort}/__ray/hmr`);
+      console.log(`  > Plugins:     http://localhost:${currentPort}/__ray/plugins`);
+    }
+    console.log(`  > SSR Status:  http://localhost:${currentPort}/__ray/ssr`);
     console.log(`  > Root:        ${projectRoot}\n`);
   });
 

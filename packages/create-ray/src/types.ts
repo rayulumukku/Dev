@@ -10,6 +10,7 @@ export interface ProjectOptions {
   language: Language;
   styling: Styling;
   packageManager: PackageManager;
+  template?: string;
   installDeps?: boolean;
   overwrite?: boolean;
 }

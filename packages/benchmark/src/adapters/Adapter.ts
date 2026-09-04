@@ -8,6 +8,6 @@ export abstract class BaseAdapter implements BundlerAdapter {
   abstract runBuild(workspaceDir: string): Promise<RawMetrics>;
   async cleanup?(workspaceDir: string): Promise<void> {}
 
-  abstract startDevServer?(workspaceDir: string): Promise<void>;
-  abstract measureHMR?(workspaceDir: string, filePath: string): Promise<number>;
+  startDevServer?(workspaceDir: string): Promise<void>;
+  measureHMR?(workspaceDir: string, filePath: string): Promise<number>;
 }

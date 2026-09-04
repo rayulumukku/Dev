@@ -119,7 +119,17 @@ export function generateProject(options: ProjectOptions) {
 
   // 6. tsconfig.json if TS
   if (isTS) {
-    const tsconfig = {\n      compilerOptions: {\n        target: 'ES2022',\n        module: 'NodeNext',\n        moduleResolution: 'NodeNext',\n        jsx: 'react-jsx',\n        strict: true,\n        skipLibCheck: true\n      },\n      include: ['src/**/*']\n    };
+    const tsconfig = {
+      compilerOptions: {
+        target: 'ES2022',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        jsx: 'react-jsx',
+        strict: true,
+        skipLibCheck: true
+      },
+      include: ['src/**/*']
+    };
     fs.writeFileSync(path.join(targetDir, 'tsconfig.json'), JSON.stringify(tsconfig, null, 2) + '\n');
   }
 }
