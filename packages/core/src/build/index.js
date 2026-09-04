@@ -11,7 +11,7 @@ import { RayCore } from '../index.js';
  */
 export async function buildProject(options) {
     const startTime = Date.now();
-    const projectRoot = process.cwd();
+    const projectRoot = options.root ? path.resolve(process.cwd(), options.root) : process.cwd();
     const baseOutDir = path.resolve(projectRoot, options.outDir);
     // Initialize RayCore orchestrator
     const core = new RayCore(projectRoot, options.mode || 'production');

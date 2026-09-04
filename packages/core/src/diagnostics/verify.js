@@ -85,9 +85,9 @@ export async function runVerify(projectRoot) {
     }
     // 5. Build verification
     try {
-        const buildReportPath = path.join(projectRoot, 'dist/client/build-report.json');
-        if (!fs.existsSync(buildReportPath)) {
-            // Create a temporary production build test
+        const ssrReportPath = path.join(projectRoot, 'dist/client/build-report.json');
+        const spaReportPath = path.join(projectRoot, 'dist/build-report.json');
+        if (!fs.existsSync(ssrReportPath) && !fs.existsSync(spaReportPath)) {
             const distDir = path.join(projectRoot, 'dist');
             if (!fs.existsSync(distDir)) {
                 buildOk = false;

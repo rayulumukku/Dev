@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { RayCore } from '../index.js';
 
 interface BuildOptions {
+  root?: string;
   outDir: string;
   minify: boolean;
   sourcemap: string | boolean;
@@ -34,7 +35,7 @@ interface BuildOptions {
  */
 export async function buildProject(options: BuildOptions) {
   const startTime = Date.now();
-  const projectRoot = process.cwd();
+  const projectRoot = options.root ? path.resolve(process.cwd(), options.root) : process.cwd();
   const baseOutDir = path.resolve(projectRoot, options.outDir);
 
   // Clean build output directory if --clean is specified

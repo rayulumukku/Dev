@@ -115,6 +115,11 @@ if (command === 'dev') {
     }
   })();
 } else if (command === 'build') {
+  let root = process.cwd();
+  if (args[1] && !args[1].startsWith('--')) {
+    root = path.resolve(process.cwd(), args[1]);
+  }
+
   let buildMode = 'production';
   const modeIdx = args.indexOf('--mode');
   if (modeIdx !== -1 && args[modeIdx + 1]) {
@@ -122,6 +127,7 @@ if (command === 'dev') {
   }
 
   const options = {
+    root,
     outDir: 'dist',
     minify: true,
     sourcemap: 'external' as any,
@@ -569,15 +575,19 @@ export default defineConfig({
 } else if (command === 'doctor') {
   (async () => {
     try {
+      let root = process.cwd();
+      if (args[1] && !args[1].startsWith('--')) {
+        root = path.resolve(process.cwd(), args[1]);
+      }
       const fix = args.includes('--fix');
       if (fix) {
         console.log('[Ray Doctor] Running automatic configurations fix/migration...');
-        const configPath = path.join(process.cwd(), 'ray.config.ts');
+        const configPath = path.join(root, 'ray.config.ts');
         if (!fs.existsSync(configPath)) {
           let content = `import { defineConfig } from '@ray/core';\n\nexport default defineConfig({\n  mode: 'development'\n});\n`;
           
-          const viteConfigTs = path.join(process.cwd(), 'vite.config.ts');
-          const viteConfigJs = path.join(process.cwd(), 'vite.config.js');
+          const viteConfigTs = path.join(root, 'vite.config.ts');
+          const viteConfigJs = path.join(root, 'vite.config.js');
           if (fs.existsSync(viteConfigTs) || fs.existsSync(viteConfigJs)) {
             const viteText = fs.readFileSync(fs.existsSync(viteConfigTs) ? viteConfigTs : viteConfigJs, 'utf-8');
             let pluginsImport = "import { defineConfig } from '@ray/core';";
@@ -601,7 +611,7 @@ export default defineConfig({
       }
 
       const { runDoctor, printDoctorReport } = await import('@ray/core');
-      const report = await runDoctor(process.cwd());
+      const report = await runDoctor(root);
       printDoctorReport(report);
       process.exit(report.nodeOk && report.configOk ? 0 : 1);
     } catch (err: any) {
@@ -654,8 +664,12 @@ export default defineConfig({
 } else if (command === 'verify') {
   (async () => {
     try {
+      let root = process.cwd();
+      if (args[1] && !args[1].startsWith('--')) {
+        root = path.resolve(process.cwd(), args[1]);
+      }
       const { runVerify, printVerifyReport } = await import('@ray/core');
-      const report = await runVerify(process.cwd());
+      const report = await runVerify(root);
       printVerifyReport(report);
       const allOk = report.configOk && report.graphOk && report.cacheOk && report.ssrOk && report.buildOk;
       process.exit(allOk ? 0 : 1);
