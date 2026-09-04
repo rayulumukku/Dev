@@ -1,8 +1,11 @@
 import { CodeFrameSnippet } from './types.js';
 
 export function generateCodeFrame(sourceCode: string, lineNumber: number, columnNumber?: number): CodeFrameSnippet {
+  if (!sourceCode || typeof sourceCode !== 'string') {
+    return { lines: [], startLine: 0, endLine: 0, columnNumber };
+  }
   const allLines = sourceCode.split('\n');
-  const targetIdx = lineNumber - 1;
+  const targetIdx = Math.max(0, (lineNumber || 1) - 1);
   const startIdx = Math.max(0, targetIdx - 2);
   const endIdx = Math.min(allLines.length - 1, targetIdx + 2);
 

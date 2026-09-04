@@ -54,4 +54,35 @@ describe('HMR Error Overlay Version 2 (PR-21)', () => {
     expect(isAllResolved).toBe(true);
     expect(tracker.hasErrors()).toBe(false);
   });
+
+  it('should parse Firefox and Safari stack traces into structured frames', () => {
+    const ffStack = `render@http://localhost:3000/src/App.tsx:15:20\n@http://localhost:3000/src/main.jsx:30:10`;
+    const frames = parseStackTrace(ffStack);
+
+    expect(frames.length).toBe(2);
+    expect(frames[0].functionName).toBe('render');
+    expect(frames[0].fileName).toBe('http://localhost:3000/src/App.tsx');
+    expect(frames[0].lineNumber).toBe(15);
+    expect(frames[0].columnNumber).toBe(20);
+    expect(frames[1].functionName).toBe('anonymous');
+    expect(frames[1].lineNumber).toBe(30);
+  });
+
+  it('should safely handle empty or missing source code in code frame generator', () => {
+    const emptyFrame = generateCodeFrame('', 5);
+    expect(emptyFrame.lines.length).toBe(0);
+
+    const undefFrame = generateCodeFrame(undefined as any, 1);
+    expect(undefFrame.lines.length).toBe(0);
+  });
+
+  it('should extract fileName and lineNumber from stack frames when not on rawError object', () => {
+    const err = new Error('Runtime bug occurred');
+    err.stack = `Error: Runtime bug occurred\n    at renderComponent (http://localhost:3000/src/Button.tsx:42:10)`;
+    const parsed = overlay.showError(err, 'runtime');
+
+    expect(parsed.fileName).toBe('http://localhost:3000/src/Button.tsx');
+    expect(parsed.lineNumber).toBe(42);
+    expect(parsed.columnNumber).toBe(10);
+  });
 });

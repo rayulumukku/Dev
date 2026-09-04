@@ -46,10 +46,32 @@ export class ScopeAnalyzer {
     (node as any)._scope = currentScope;
 
     if (node.type === NodeType.Program) {
-      // Hoist function declarations in program scope
+      // Pre-declare top-level declarations so functions/closures can reference them regardless of statement order
       node.body.forEach((child: any) => {
-        if (child && child.type === NodeType.FunctionDeclaration && child.id && child.id.name) {
+        if (!child) return;
+        if (child.type === NodeType.FunctionDeclaration && child.id && child.id.name) {
           currentScope.declare(child.id.name, child);
+        } else if (child.type === NodeType.ImportDeclaration && child.specifiers) {
+          child.specifiers.forEach((spec: any) => {
+            if (spec.local && spec.local.name) currentScope.declare(spec.local.name, spec);
+          });
+        } else if ((child.type === NodeType.VariableDeclaration || child.type === NodeType.UsingDeclaration) && child.declarations) {
+          child.declarations.forEach((decl: any) => {
+            this.declarePattern(decl.id, currentScope, decl);
+          });
+        } else if (child.type === NodeType.ClassDeclaration && child.id && child.id.name) {
+          currentScope.declare(child.id.name, child);
+        } else if (child.type === NodeType.ExportNamedDeclaration && child.declaration) {
+          const d = child.declaration;
+          if (d.type === NodeType.FunctionDeclaration && d.id && d.id.name) {
+            currentScope.declare(d.id.name, d);
+          } else if ((d.type === NodeType.VariableDeclaration || d.type === NodeType.UsingDeclaration) && d.declarations) {
+            d.declarations.forEach((decl: any) => {
+              this.declarePattern(decl.id, currentScope, decl);
+            });
+          } else if (d.type === NodeType.ClassDeclaration && d.id && d.id.name) {
+            currentScope.declare(d.id.name, d);
+          }
         }
       });
       node.body.forEach((child: any) => this.visit(child, currentScope));
@@ -179,7 +201,18 @@ export class ScopeAnalyzer {
         if (p.type === NodeType.SpreadElement) {
           this.visit(p.argument, currentScope);
         } else {
-          if (p.value) this.visit(p.value, currentScope);
+          if (p.computed && p.key) this.visit(p.key, currentScope);
+          if (p.value) {
+            if (p.method || p.value.type === NodeType.FunctionDeclaration) {
+              const funcScope = new Scope(currentScope);
+              if (p.value.params) {
+                p.value.params.forEach((param: any) => this.declarePattern(param, funcScope, param));
+              }
+              if (p.value.body) this.visit(p.value.body, funcScope);
+            } else {
+              this.visit(p.value, currentScope);
+            }
+          }
         }
       });
     } else if (node.type === NodeType.SpreadElement) {
@@ -204,6 +237,26 @@ export class ScopeAnalyzer {
       }
     } else if (node.type === NodeType.ExportAllDeclaration || node.type === 'ExportAllDeclaration') {
       // export * from '...' — no local binding references
+    } else if (node.type === NodeType.JSXElement) {
+      if (node.openingElement) this.visit(node.openingElement, currentScope);
+      (node.children || []).forEach((child: any) => this.visit(child, currentScope));
+    } else if (node.type === NodeType.JSXOpeningElement) {
+      if (node.name && node.name.type === NodeType.Identifier) {
+        if (/^[A-Z]/.test(node.name.name)) {
+          currentScope.reference(node.name.name);
+        }
+      } else if (node.name && (node.name.type === NodeType.MemberExpression || node.name.type === 'MemberExpression')) {
+        this.visit(node.name, currentScope);
+      }
+      (node.attributes || []).forEach((attr: any) => this.visit(attr, currentScope));
+    } else if (node.type === NodeType.JSXAttribute) {
+      if (node.value) this.visit(node.value, currentScope);
+    } else if (node.type === NodeType.JSXSpreadAttribute) {
+      if (node.argument) this.visit(node.argument, currentScope);
+    } else if (node.type === NodeType.JSXExpressionContainer) {
+      if (node.expression) this.visit(node.expression, currentScope);
+    } else if (node.type === NodeType.JSXFragment) {
+      (node.children || []).forEach((child: any) => this.visit(child, currentScope));
     }
   }
 

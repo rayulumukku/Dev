@@ -61,11 +61,13 @@ export class RayBundler {
   private moduleOrder: string[] = [];
   /** define() map made available to traverse() for pre-compile substitution */
   private defineMap: Record<string, string> = {};
+  private container?: any;
 
-  constructor(projectRoot: string, define: Record<string, string> = {}) {
+  constructor(projectRoot: string, define: Record<string, string> = {}, container?: any) {
     this.compiler = new RayCompiler(define);
     this.resolver = new Resolver(projectRoot);
     this.defineMap = define;
+    this.container = container;
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -146,7 +148,30 @@ export class RayBundler {
     for (const spec of specifiers) {
       if (external.has(spec) || external.has(spec.split('/')[0])) continue;
       const resolved = this.resolveFile(spec, normFile);
-      if (resolved) await this.traverse(resolved, external);
+      if (resolved) {
+        await this.traverse(resolved, external);
+      } else if (this.container) {
+        try {
+          const resolvedId = await this.container.resolveId(spec, normFile);
+          if (resolvedId && (resolvedId.startsWith('\0') || resolvedId.startsWith('virtual:'))) {
+            const normVirt = normalizePath(spec);
+            if (!this.visitedModules.has(normVirt)) {
+              this.visitedModules.set(normVirt, '');
+              const loaded = await this.container.load(resolvedId);
+              if (loaded !== null) {
+                let compiledVirt = loaded;
+                try {
+                  compiledVirt = this.compiler.compile(loaded, normVirt).code;
+                } catch {}
+                this.visitedModules.set(normVirt, compiledVirt);
+                this.moduleOrder.push(normVirt);
+              }
+            }
+          }
+        } catch {
+          // ignore virtual resolution errors
+        }
+      }
     }
 
     this.visitedModules.set(normFile, compiled);
@@ -222,22 +247,45 @@ export class RayBundler {
       const varName = getFileVarName(normFile);
       const dir = path.dirname(normFile);
 
-      // 1. Matches: import x from './y'
-      const relativeImportRegex = /import\s+(\w+)\s+from\s+['"](\.\/|\.\.\/)([^'"]+)['"]\s*;?/g;
-      code = code.replace(relativeImportRegex, (match, importedName, dotPrefix, relPath) => {
-        let nestedPath = path.resolve(dir, dotPrefix + relPath);
-        if (!path.extname(nestedPath)) {
-          for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
-            if (fs.existsSync(nestedPath + ext)) {
-              nestedPath += ext;
-              break;
+      // 1. Matches: inlined module imports (relative or virtual)
+      const inlinedImportRegex = /import\s+((?:[\w$]+|\{[^}]*\}|[\w$]+\s*,\s*\{[^}]*\}|\*\s*as\s+[\w$]+))\s+from\s+['"]([^'"]+)['"]\s*;?/g;
+      code = code.replace(inlinedImportRegex, (match, clause, spec) => {
+        let targetNorm: string | null = null;
+        if (spec.startsWith('.') || spec.startsWith('/')) {
+          let nestedPath = path.resolve(dir, spec);
+          if (!path.extname(nestedPath)) {
+            for (const ext of ['.js', '.jsx', '.ts', '.tsx', '.mjs']) {
+              if (fs.existsSync(nestedPath + ext)) {
+                nestedPath += ext;
+                break;
+              }
             }
           }
+          targetNorm = normalizePath(nestedPath);
+        } else {
+          const normVirt = normalizePath(spec);
+          if (this.visitedModules.has(normVirt)) {
+            targetNorm = normVirt;
+          }
         }
-        const normNested = normalizePath(nestedPath);
-        if (this.visitedModules.has(normNested)) {
-          const nestedVar = getFileVarName(normNested);
-          return `const ${importedName} = ${nestedVar};`;
+
+        if (targetNorm && this.visitedModules.has(targetNorm)) {
+          const nestedVar = getFileVarName(targetNorm);
+          clause = clause.trim();
+          if (clause.startsWith('* as ')) {
+            const ns = clause.slice(5).trim();
+            return `const ${ns} = ${nestedVar};`;
+          }
+          if (clause.startsWith('{')) {
+            return `const ${clause} = ${nestedVar};`;
+          }
+          if (clause.includes(',')) {
+            const parts = clause.split(',');
+            const def = parts[0].trim();
+            const named = parts.slice(1).join(',').trim();
+            return `const ${def} = ${nestedVar};\nconst ${named} = ${nestedVar};`;
+          }
+          return `const ${clause} = ${nestedVar};`;
         }
         return match;
       });
@@ -291,21 +339,61 @@ export class RayBundler {
         return match;
       });
 
-      // 3. For nested inlined modules, rewrite "export default" to a local binding assignment
-      // and strip relative exports.
+      // 3. For nested inlined modules, rewrite exports to local bindings and isolate scope
       if (!isEntry) {
-        code = code.replace(/\bexport default\s+/g, `const ${varName} = `);
-        code = code.replace(/export\s+const\s+[a-zA-Z0-9_$]+\s*=\s*__cjs_module_[a-zA-Z0-9_$]+__\.exports\.[a-zA-Z0-9_$]+;?/g, '');
-        code = code.replace(/\bexport\s+(const|let|var|function|class)\s+/g, '$1 ');
-        code = code.replace(/export\s+\*\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
-        code = code.replace(/export\s+{[^}]+}\s+from\s+['"](\.\/|\.\.\/)[^'"]+['"]\s*;?/g, '');
-      }
+        const exportedNames: string[] = [];
+        code = code.replace(/\bexport\s+(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/g, (_m, n) => {
+          exportedNames.push(n);
+          return `const ${n} =`;
+        });
+        code = code.replace(/\bexport\s+function\s+([a-zA-Z0-9_$]+)/g, (_m, n) => {
+          exportedNames.push(n);
+          return `function ${n}`;
+        });
+        code = code.replace(/\bexport\s+class\s+([a-zA-Z0-9_$]+)/g, (_m, n) => {
+          exportedNames.push(n);
+          return `class ${n}`;
+        });
+        code = code.replace(/\bexport\s+\{([^}]+)\}\s*;?/g, (_m, list) => {
+          list.split(',').map((s: string) => s.trim()).filter(Boolean).forEach((s: string) => {
+            const parts = s.split(/\s+as\s+/);
+            const localName = parts[0].trim();
+            const exportName = parts[1] ? parts[1].trim() : localName;
+            exportedNames.push(exportName === localName ? localName : `${exportName}: ${localName}`);
+          });
+          return '';
+        });
 
-      code = this.wrapModule(normFile, code, options.format);
+        let returnStmt = '';
+        if (code.includes('export default')) {
+          code = code.replace(/\bexport default\s+/g, `const __default_export__ = `);
+          if (exportedNames.length > 0) {
+            returnStmt = `return Object.assign(__default_export__, { ${exportedNames.join(', ')} });`;
+          } else {
+            returnStmt = `return __default_export__;`;
+          }
+        } else if (exportedNames.length > 0) {
+          returnStmt = `return { ${exportedNames.join(', ')} };`;
+        } else {
+          returnStmt = `return {};`;
+        }
+
+        code = code.replace(/export\s+const\s+[a-zA-Z0-9_$]+\s*=\s*__cjs_module_[a-zA-Z0-9_$]+__\.exports\.[a-zA-Z0-9_$]+;?/g, '');
+        code = code.replace(/export\s+\*\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+        code = code.replace(/export\s+{[^}]+}\s+from\s+['"][^'"]+['"]\s*;?/g, '');
+
+        code = `const ${varName} = (() => {\n${code}\n${returnStmt}\n})();`;
+      } else {
+        code = this.wrapModule(normFile, code, options.format);
+      }
       parts.push(`/* ${path.relative(path.dirname(normEntry), normFile)} */\n${code}`);
     }
 
     let bundleCode = parts.join('\n\n');
+
+    if (options.format === 'esm') {
+      bundleCode = this.hoistAndDeduplicateImports(bundleCode);
+    }
 
     // Wrap for UMD / IIFE
     if (options.format === 'umd' || options.format === 'iife') {
@@ -346,5 +434,58 @@ export class RayBundler {
       results[fmt] = await this.bundle({ entryPoint, outFile, format: fmt === 'umd' ? 'umd' : fmt, ...baseOptions });
     }
     return results;
+  }
+
+  private hoistAndDeduplicateImports(code: string): string {
+    const map = new Map<string, { defaultName: string | null; namespace: string | null; named: Set<string> }>();
+    const sideEffects = new Set<string>();
+
+    const importRegex = /import\s+((?:[\w$]+|\{[^}]*\}|[\w$]+\s*,\s*\{[^}]*\}|\*\s*as\s+[\w$]+))\s+from\s+['"]([^'"]+)['"]\s*;?/g;
+    let stripped = code.replace(importRegex, (match, clause, pkg) => {
+      if (pkg.startsWith('.') || pkg.startsWith('/')) return match;
+      if (!map.has(pkg)) {
+        map.set(pkg, { defaultName: null, namespace: null, named: new Set<string>() });
+      }
+      const rec = map.get(pkg)!;
+      clause = clause.trim();
+      if (clause.startsWith('* as ')) {
+        rec.namespace = clause.slice(5).trim();
+      } else if (clause.startsWith('{')) {
+        clause.slice(1, -1).split(',').map((s: string) => s.trim()).filter(Boolean).forEach((s: string) => rec.named.add(s));
+      } else if (clause.includes(',')) {
+        const parts = clause.split(',');
+        rec.defaultName = parts[0].trim();
+        parts.slice(1).join(',').replace(/[{}]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean).forEach((s: string) => rec.named.add(s));
+      } else {
+        rec.defaultName = clause.trim();
+      }
+      return '';
+    });
+
+    const sideEffectRegex = /import\s+['"]([^'"]+)['"]\s*;?/g;
+    stripped = stripped.replace(sideEffectRegex, (match, pkg) => {
+      if (pkg.startsWith('.') || pkg.startsWith('/')) return match;
+      sideEffects.add(pkg);
+      return '';
+    });
+
+    const headers: string[] = [];
+    for (const pkg of sideEffects) {
+      headers.push(`import '${pkg}';`);
+    }
+    for (const [pkg, rec] of map.entries()) {
+      if (rec.namespace) {
+        headers.push(`import * as ${rec.namespace} from '${pkg}';`);
+      } else if (rec.defaultName && rec.named.size > 0) {
+        headers.push(`import ${rec.defaultName}, { ${Array.from(rec.named).join(', ')} } from '${pkg}';`);
+      } else if (rec.defaultName) {
+        headers.push(`import ${rec.defaultName} from '${pkg}';`);
+      } else if (rec.named.size > 0) {
+        headers.push(`import { ${Array.from(rec.named).join(', ')} } from '${pkg}';`);
+      }
+    }
+
+    if (headers.length === 0) return stripped;
+    return headers.join('\n') + '\n\n' + stripped.trimStart();
   }
 }

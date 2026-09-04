@@ -12,7 +12,8 @@ export interface ProcessRunResult {
 export function runProcess(command: string, args: string[], cwd: string, timeoutMs: number = 30000): Promise<ProcessRunResult> {
   return new Promise((resolve, reject) => {
     const start = performance.now();
-    const child: ChildProcess = spawn(command, args, { cwd, shell: true });
+    const fullCmd = [command, ...args].join(' ');
+    const child: ChildProcess = spawn(fullCmd, { cwd, shell: true });
 
     let stdout = '';
     let stderr = '';

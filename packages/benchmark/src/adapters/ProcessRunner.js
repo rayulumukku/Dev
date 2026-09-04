@@ -3,7 +3,8 @@ import { spawn } from 'child_process';
 export function runProcess(command, args, cwd, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const start = performance.now();
-    const child = spawn(command, args, { cwd, shell: true });
+    const fullCmd = [command, ...args].join(' ');
+    const child = spawn(fullCmd, { cwd, shell: true });
 
     let stdout = '';
     let stderr = '';

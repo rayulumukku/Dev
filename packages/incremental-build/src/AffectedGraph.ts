@@ -7,11 +7,13 @@ export class AffectedGraph {
       const current = queue.shift()!;
 
       if (graph && typeof graph.getImporters === 'function') {
-        const importers: Set<string> = graph.getImporters(current);
-        for (const imp of importers) {
-          if (!affected.has(imp)) {
-            affected.add(imp);
-            queue.push(imp);
+        const importers = graph.getImporters(current);
+        if (importers && typeof importers[Symbol.iterator] === 'function') {
+          for (const imp of importers) {
+            if (!affected.has(imp)) {
+              affected.add(imp);
+              queue.push(imp);
+            }
           }
         }
       }

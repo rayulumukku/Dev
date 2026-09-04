@@ -1,4 +1,4 @@
-export * from './runtime.js';
+export { hmrClientCode } from '../dist/index.js';
 export * from './overlay/types.js';
 export * from './overlay/ErrorParser.js';
 export * from './overlay/SourceMapResolver.js';

@@ -182,7 +182,7 @@ export async function buildProject(options: BuildOptions) {
     const reports: any[] = [];
 
     // Bundle each format via RayBundler (native — no esbuild)
-    const bundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+    const bundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' }, core.container);
 
     for (const format of libConfig.formats) {
       console.log(`  > Compiling format: ${format}`);
@@ -329,7 +329,7 @@ export async function buildProject(options: BuildOptions) {
   }
 
   // 4. Compile Client Assets via RayBundler
-  const clientBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+  const clientBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' }, core.container);
   const clientBundleOut = await clientBundler.bundle({
     entryPoint: entryFilePath,
     outFile: path.join(clientOutDir, 'assets', 'main.js'),
@@ -419,7 +419,7 @@ export async function buildProject(options: BuildOptions) {
       throw new Error(`Server entry script "src/entry-server.jsx" not found.`);
     }
 
-    const serverBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' });
+    const serverBundler = new RayBundler(projectRoot, { 'process.env.NODE_ENV': '"production"' }, core.container);
     await serverBundler.bundle({
       entryPoint: serverEntryFilePath,
       outFile: path.join(serverOutDir, 'server.js'),

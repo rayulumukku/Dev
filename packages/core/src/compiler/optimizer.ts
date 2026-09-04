@@ -54,7 +54,18 @@ export class Optimizer {
 
     if (node.type === NodeType.FunctionDeclaration || node.type === NodeType.ArrowFunctionExpression) {
       if (node.type === NodeType.FunctionDeclaration && node.id && node.id.name) {
-        if (parentType !== NodeType.ExportNamedDeclaration && parentType !== NodeType.ExportDefaultDeclaration) {
+        if (
+          parentType !== NodeType.ExportNamedDeclaration &&
+          parentType !== NodeType.ExportDefaultDeclaration &&
+          parentType !== NodeType.ObjectExpression &&
+          parentType !== NodeType.Property &&
+          parentType !== 'ObjectExpression' &&
+          parentType !== 'Property' &&
+          parentType !== NodeType.CallExpression &&
+          parentType !== NodeType.NewExpression &&
+          parentType !== NodeType.AssignmentExpression &&
+          parentType !== NodeType.VariableDeclarator
+        ) {
           const binding = currentScope.getBinding(node.id.name);
           if (binding && binding.referencesCount === 0) {
             console.log(`[Ray Tree Shaking] Pruned unreferenced function: ${node.id.name}`);
@@ -323,6 +334,38 @@ export class Optimizer {
           return node.alternate || { type: NodeType.BlockStatement, body: [] };
         }
       }
+    }
+
+    // ── JSX Elements ──
+    if (node.type === NodeType.JSXElement) {
+      if (node.openingElement) node.openingElement = this.visit(node.openingElement, currentScope, node.type);
+      if (node.children) node.children = node.children.map((c: any) => this.visit(c, currentScope, node.type)).filter(Boolean);
+      return node;
+    }
+
+    if (node.type === NodeType.JSXOpeningElement) {
+      if (node.attributes) node.attributes = node.attributes.map((a: any) => this.visit(a, currentScope, node.type)).filter(Boolean);
+      return node;
+    }
+
+    if (node.type === NodeType.JSXAttribute) {
+      if (node.value) node.value = this.visit(node.value, currentScope, node.type);
+      return node;
+    }
+
+    if (node.type === NodeType.JSXSpreadAttribute) {
+      if (node.argument) node.argument = this.visit(node.argument, currentScope, node.type);
+      return node;
+    }
+
+    if (node.type === NodeType.JSXExpressionContainer) {
+      if (node.expression) node.expression = this.visit(node.expression, currentScope, node.type);
+      return node;
+    }
+
+    if (node.type === NodeType.JSXFragment) {
+      if (node.children) node.children = node.children.map((c: any) => this.visit(c, currentScope, node.type)).filter(Boolean);
+      return node;
     }
 
     return node;
