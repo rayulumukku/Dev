@@ -97,6 +97,7 @@ export class RayCompiler {
     // -----------------------------------------------------------------------
     // Code Generator — prefer Rust backend when available
     // -----------------------------------------------------------------------
+    const startEmit = performance.now();
     let output: string;
     let map: SourceMap;
 
@@ -123,7 +124,7 @@ export class RayCompiler {
       ({ code: output, map } = codegen.generateWithSourceMap(optimizedAst, file));
     }
 
-    const emitTimeMs = Number((performance.now() - performance.now()).toFixed(2));
+    const emitTimeMs = Number((performance.now() - startEmit).toFixed(2));
 
     return {
       code: output,

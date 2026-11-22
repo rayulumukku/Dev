@@ -42,9 +42,7 @@ describe('Remote Cache Support (PR-27)', () => {
     };
 
     remoteCache.set(artifact);
-
-    // Give upload queue time to process
-    await new Promise((r) => setTimeout(r, 100));
+    await remoteCache.drain();
 
     const retrieved = await remoteCache.get('hash-abc');
     expect(retrieved).not.toBeNull();

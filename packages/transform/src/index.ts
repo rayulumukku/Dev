@@ -1,6 +1,7 @@
 import path from 'path';
+import fs from 'fs';
 import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { createTransformContext, TransformContext, TransformContextOptions } from './TransformContext.js';
 
 export * from './TransformContext.js';
@@ -17,15 +18,17 @@ let _compiler: any = null;
 
 async function getCompiler(): Promise<any> {
   if (_compiler) return _compiler;
-  // Resolve RayCompiler from the compiled @ray/core dist output
+  // Resolve RayCompiler from the source or compiled @ray/core dist output
   const candidates = [
+    path.join(__dirname, '../../core/src/compiler/index.ts'),
     path.join(__dirname, '../../core/dist/compiler/index.js'),
     path.join(__dirname, '../../../core/dist/compiler/index.js'),
   ];
   let RayCompiler: any = null;
   for (const c of candidates) {
+    if (!fs.existsSync(c)) continue;
     try {
-      const fileUrl = new URL(`file://${c.replace(/\\/g, '/')}`).toString();
+      const fileUrl = pathToFileURL(c).href;
       const mod = await import(fileUrl);
       RayCompiler = mod.RayCompiler;
       if (RayCompiler) break;

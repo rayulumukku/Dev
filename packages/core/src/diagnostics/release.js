@@ -69,6 +69,7 @@ export async function runRelease(projectRoot, options) {
     if (fs.existsSync(demoDir)) {
         const { buildProject } = await import('../build/index.js');
         await buildProject({
+            root: demoDir,
             outDir: path.join(demoDir, 'dist'),
             minify: true,
             sourcemap: false,
@@ -92,13 +93,20 @@ export async function runRelease(projectRoot, options) {
         catch (err) {
             throw new Error(`[Ray Release Regression Check Failed] Unit or integration tests failed: ${err.message}`);
         }
-        console.log(`\n✅ [Ray Release] Executing E2E browser regression test suite (Playwright)...`);
-        try {
-            execSync('npx playwright test', { cwd: projectRoot, stdio: 'inherit' });
-            console.log(`✨ [Ray Release] E2E browser integration tests passed.`);
+        const playwrightConfig = path.join(projectRoot, 'playwright.config.ts');
+        const playwrightConfigJs = path.join(projectRoot, 'playwright.config.js');
+        if (fs.existsSync(playwrightConfig) || fs.existsSync(playwrightConfigJs)) {
+            console.log(`\n✅ [Ray Release] Executing E2E browser regression test suite (Playwright)...`);
+            try {
+                execSync('npx playwright test', { cwd: projectRoot, stdio: 'inherit' });
+                console.log(`✨ [Ray Release] E2E browser integration tests passed.`);
+            }
+            catch (err) {
+                throw new Error(`[Ray Release Regression Check Failed] E2E browser integration tests failed: ${err.message}`);
+            }
         }
-        catch (err) {
-            throw new Error(`[Ray Release Regression Check Failed] E2E browser integration tests failed: ${err.message}`);
+        else {
+            console.log(`\nℹ️  [Ray Release] Playwright configuration not found; skipping E2E browser integration tests.`);
         }
     }
     // 1.1 Performance Verification Check

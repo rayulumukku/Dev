@@ -44,6 +44,10 @@ export class RemoteCacheManager {
     });
   }
 
+  async drain() {
+    await this.uploadQueue.drain();
+  }
+
   recordLocalHit() {
     this.stats.localHits++;
     this.updateHitRate();

@@ -64,7 +64,11 @@ export class Optimizer {
           parentType !== NodeType.CallExpression &&
           parentType !== NodeType.NewExpression &&
           parentType !== NodeType.AssignmentExpression &&
-          parentType !== NodeType.VariableDeclarator
+          parentType !== NodeType.VariableDeclarator &&
+          parentType !== NodeType.MethodDefinition &&
+          parentType !== 'MethodDefinition' &&
+          parentType !== NodeType.PropertyDefinition &&
+          parentType !== 'PropertyDefinition'
         ) {
           const binding = currentScope.getBinding(node.id.name);
           if (binding && binding.referencesCount === 0) {
@@ -307,7 +311,7 @@ export class Optimizer {
           shouldFold = true;
         }
 
-        if (shouldFold) {
+        if (shouldFold && (typeof foldedValue !== 'number' || Number.isFinite(foldedValue))) {
           return {
             type: NodeType.Literal,
             value: foldedValue,

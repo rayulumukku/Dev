@@ -12,14 +12,14 @@ const testTmpDir = path.resolve(process.cwd(), 'temp-ray-adapter-test');
 describe('Official Ray Benchmark Adapter (PR-19)', () => {
   beforeEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
     fs.mkdirSync(testTmpDir, { recursive: true });
   });
 
   afterEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
   });
 

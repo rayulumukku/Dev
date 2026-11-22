@@ -2,11 +2,19 @@ export class UploadQueue {
   constructor() {
     this.queue = [];
     this.active = false;
+    this.drainResolvers = [];
   }
 
   add(task) {
     this.queue.push(task);
     this.process();
+  }
+
+  async drain() {
+    if (!this.active && this.queue.length === 0) return;
+    return new Promise((resolve) => {
+      this.drainResolvers.push(resolve);
+    });
   }
 
   async process() {
@@ -25,5 +33,10 @@ export class UploadQueue {
     }
 
     this.active = false;
+    const resolvers = this.drainResolvers.slice();
+    this.drainResolvers = [];
+    for (const r of resolvers) {
+      r();
+    }
   }
 }

@@ -71,6 +71,19 @@ export interface BuildConfig {
 }
 
 export interface RayConfig {
+  root?: string;
+  mode?: string;
+  envPrefix?: string;
+  compiler?: 'auto' | 'rust' | 'ts';
+  define?: Record<string, any>;
+  server?: {
+    port?: number;
+    open?: boolean;
+    proxy?: Record<string, any>;
+  };
+  resolve?: {
+    alias?: Record<string, string>;
+  };
   plugins?: RayPlugin[];
   build?: BuildConfig;
 }

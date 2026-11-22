@@ -11,14 +11,14 @@ const testTmpDir = path.resolve(process.cwd(), 'temp-create-ray-engine-test');
 describe('Full create-ray Scaffolding Engine (PR-15)', () => {
   beforeEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
     fs.mkdirSync(testTmpDir, { recursive: true });
   });
 
   afterEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
   });
 

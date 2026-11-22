@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { GraphInspectorServer } from './Server.js';
 
 export async function runCLI() {

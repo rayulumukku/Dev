@@ -62,7 +62,7 @@ describe('SSR & SSG and Library Mode Integration Tests', () => {
   });
 
   afterAll(() => {
-    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(projectRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
   it('should run ssrLoadModule successfully', async () => {
@@ -76,33 +76,27 @@ describe('SSR & SSG and Library Mode Integration Tests', () => {
   });
 
   it('should build project in SSG mode', async () => {
-    const originalDir = process.cwd();
-    process.chdir(projectRoot);
+    await buildProject({
+      root: projectRoot,
+      outDir: 'dist',
+      minify: true,
+      sourcemap: false,
+      watch: false,
+      analyze: false,
+      ssg: true,
+    });
 
-    try {
-      await buildProject({
-        outDir: 'dist',
-        minify: true,
-        sourcemap: false,
-        watch: false,
-        analyze: false,
-        ssg: true,
-      });
+    const distDir = path.join(projectRoot, 'dist');
+    expect(fs.existsSync(distDir)).toBe(true);
 
-      const distDir = path.join(projectRoot, 'dist');
-      expect(fs.existsSync(distDir)).toBe(true);
+    // Check client outputs
+    const clientHtml = fs.readFileSync(path.join(distDir, 'client/index.html'), 'utf-8');
+    expect(clientHtml).toContain('<div>Hello SSR HTML from Server</div>');
+    expect(clientHtml).toContain('window.__RAY_DATA__');
 
-      // Check client outputs
-      const clientHtml = fs.readFileSync(path.join(distDir, 'client/index.html'), 'utf-8');
-      expect(clientHtml).toContain('<div>Hello SSR HTML from Server</div>');
-      expect(clientHtml).toContain('window.__RAY_DATA__');
-
-      // Check build-report
-      const buildReport = JSON.parse(fs.readFileSync(path.join(distDir, 'client/build-report.json'), 'utf-8'));
-      expect(buildReport.buildDurationMs).toBeGreaterThan(0);
-    } finally {
-      process.chdir(originalDir);
-    }
+    // Check build-report
+    const buildReport = JSON.parse(fs.readFileSync(path.join(distDir, 'client/build-report.json'), 'utf-8'));
+    expect(buildReport.buildDurationMs).toBeGreaterThan(0);
   });
 
   it('should build in Library Mode', async () => {
@@ -115,11 +109,9 @@ describe('SSR & SSG and Library Mode Integration Tests', () => {
       JSON.stringify({ name: 'mock-library', version: '1.0.0', type: 'module' }, null, 2)
     );
 
-    const originalDir = process.cwd();
-    process.chdir(libRoot);
-
     try {
       await buildProject({
+        root: libRoot,
         outDir: 'dist',
         minify: true,
         sourcemap: false,
@@ -142,8 +134,7 @@ describe('SSR & SSG and Library Mode Integration Tests', () => {
       expect(report.formats).toContain('cjs');
       expect(report.formats).toContain('umd');
     } finally {
-      process.chdir(originalDir);
-      fs.rmSync(libRoot, { recursive: true, force: true });
+      fs.rmSync(libRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
   });
 });

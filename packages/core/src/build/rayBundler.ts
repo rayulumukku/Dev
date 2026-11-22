@@ -187,9 +187,50 @@ export class RayBundler {
     if (format === 'cjs') {
       return code
         .replace(/\bexport default\s+/g, 'module.exports = ')
-        .replace(/\bexport (const|let|var|function|class) (\w+)/g, (_, kw, name) => {
-          return `${kw} ${name}; exports.${name} = ${name};`;
-        });
+        // Destructuring exports: export const { a, b } = expr or export const [a, b] = arr
+        .replace(/\bexport (const|let|var)\s+(\{[^;\n]+\}|\[[^;\n]+\])\s*=\s*([^;\n]+)(;?)/g, (_match, kw, pattern, rhs, semi) => {
+          const names: string[] = [];
+          const inner = pattern.slice(1, -1);
+          for (let part of inner.split(',')) {
+            part = part.trim();
+            if (!part) continue;
+            if (part.includes('=')) part = part.split('=')[0].trim();
+            if (part.includes(':')) part = part.split(':')[1].trim();
+            if (part.startsWith('...')) part = part.slice(3).trim();
+            const m = part.match(/^[a-zA-Z0-9_$]+/);
+            if (m) names.push(m[0]);
+          }
+          const assignments = names.map(n => `exports.${n} = ${n};`).join(' ');
+          return `${kw} ${pattern} = ${rhs}${semi || ';'}\n${assignments}`;
+        })
+        // Uninitialized variable exports: export let a; or export var a, b;
+        .replace(/\bexport (let|var)\s+([^=;\n]+)\s*;/g, (_match, kw, decls) => {
+          const names = decls.split(',').map((s: string) => s.trim()).filter((s: string) => /^[a-zA-Z0-9_$]+$/.test(s));
+          if (names.length > 0) {
+            const assignments = names.map((n: string) => `exports.${n} = ${n};`).join(' ');
+            return `${kw} ${decls};\n${assignments}`;
+          }
+          return `${kw} ${decls};`;
+        })
+        // Named export clauses: export { a, b }; or export { a as x };
+        .replace(/\bexport\s*\{([^}]+)\}(?!\s*from)\s*;?/g, (_match, list) => {
+          return list.split(',').map((s: string) => {
+            s = s.trim();
+            if (!s) return '';
+            const parts = s.split(/\s+as\s+/);
+            const localName = parts[0].trim();
+            const exportName = parts[1] ? parts[1].trim() : localName;
+            return `exports.${exportName} = ${localName};`;
+          }).filter(Boolean).join(' ');
+        })
+        // Simple variable exports: export const/let/var x = ...
+        .replace(/\bexport (const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/g, '$1 $2 = exports.$2 = ')
+        // Function exports
+        .replace(/\bexport (async\s+)?function\s+(\w+)/g, (_, asyncKw, name) => {
+          return `exports.${name} = ${name}; ${asyncKw || ''}function ${name}`;
+        })
+        // Class exports
+        .replace(/\bexport class\s+(\w+)/g, 'const $1 = exports.$1 = class $1');
     }
     // iife / umd: handled at bundle level
     return code;
@@ -342,6 +383,23 @@ export class RayBundler {
       // 3. For nested inlined modules, rewrite exports to local bindings and isolate scope
       if (!isEntry) {
         const exportedNames: string[] = [];
+        code = code.replace(/\bexport\s+(?:const|let|var)\s+(\{[^;\n]+\}|\[[^;\n]+\])\s*=/g, (_m, pattern) => {
+          const inner = pattern.slice(1, -1);
+          for (let part of inner.split(',')) {
+            part = part.trim();
+            if (!part) continue;
+            if (part.includes('=')) part = part.split('=')[0].trim();
+            if (part.includes(':')) part = part.split(':')[1].trim();
+            if (part.startsWith('...')) part = part.slice(3).trim();
+            const match = part.match(/^[a-zA-Z0-9_$]+/);
+            if (match) exportedNames.push(match[0]);
+          }
+          return `const ${pattern} =`;
+        });
+        code = code.replace(/\bexport\s+(?:let|var)\s+([a-zA-Z0-9_$]+)\s*;/g, (_m, n) => {
+          exportedNames.push(n);
+          return `let ${n};`;
+        });
         code = code.replace(/\bexport\s+(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/g, (_m, n) => {
           exportedNames.push(n);
           return `const ${n} =`;

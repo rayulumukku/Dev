@@ -14,7 +14,7 @@ describe('RayFS File System Watcher & Benchmark Tests', () => {
   });
 
   afterAll(() => {
-    fs.rmSync(watchDir, { recursive: true, force: true });
+    fs.rmSync(watchDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
   it('should detect incremental file change events and batch them', async () => {
@@ -25,12 +25,15 @@ describe('RayFS File System Watcher & Benchmark Tests', () => {
       events.push(file);
     });
 
+    // Allow watcher initialization
+    await new Promise(r => setTimeout(r, 100));
+
     const targetFile = path.join(watchDir, 'src/temp.js');
     fs.writeFileSync(targetFile, 'console.log("change 1");');
     fs.writeFileSync(targetFile, 'console.log("change 2");');
 
     // Wait for debouncing window (40ms) to flush batch
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
 
     expect(events.length).toBeGreaterThan(0);
     expect(events[0]).toBe(targetFile);

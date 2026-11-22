@@ -61,7 +61,14 @@ ${transformed}
 
   // 7. Generate final exports
   let bottomExports = `\nexport default __cjs_module_${uid}__.exports;\n`;
+  const reservedKeywords = new Set([
+    'default', 'class', 'function', 'const', 'let', 'var', 'switch', 'case',
+    'return', 'import', 'export', 'delete', 'typeof', 'void', 'do', 'while',
+    'for', 'in', 'instanceof', 'new', 'this', 'throw', 'try', 'catch',
+    'finally', 'with', 'yield', 'await', 'null', 'true', 'false'
+  ]);
   for (const name of exportNames) {
+    if (reservedKeywords.has(name)) continue;
     bottomExports += `export const ${name} = __cjs_module_${uid}__.exports.${name};\n`;
   }
 

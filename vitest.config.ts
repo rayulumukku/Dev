@@ -4,6 +4,19 @@ import path from 'path';
 export default defineConfig({
   resolve: {
     alias: {
+      '@ray/fs': path.resolve(__dirname, './packages/fs/src/index.ts'),
+      '@ray/benchmark': path.resolve(__dirname, './packages/benchmark/src/index.ts'),
+      '@ray/cache': path.resolve(__dirname, './packages/cache/src/index.ts'),
+      '@ray/cli': path.resolve(__dirname, './packages/cli/src/cli.ts'),
+      'create-ray': path.resolve(__dirname, './packages/create-ray/src/index.ts'),
+      'create-ray-plugin': path.resolve(__dirname, './packages/create-ray-plugin/src/cli.ts'),
+      '@ray/graph-inspector': path.resolve(__dirname, './packages/graph-inspector/src/index.ts'),
+      '@ray/plugin-css': path.resolve(__dirname, './packages/plugin-css/src/index.ts'),
+      '@ray/plugin-vue': path.resolve(__dirname, './packages/plugin-vue/src/index.ts'),
+      '@ray/remote-cache': path.resolve(__dirname, './packages/remote-cache/src/index.ts'),
+      '@ray/ssg': path.resolve(__dirname, './packages/ssg/src/index.ts'),
+      '@ray/ssr': path.resolve(__dirname, './packages/ssr/src/index.ts'),
+      '@ray/workspace': path.resolve(__dirname, './packages/workspace/src/index.ts'),
       '@ray/migrate': path.resolve(__dirname, './packages/migrate/src/index.ts'),
       '@ray/plugin-compat': path.resolve(__dirname, './packages/plugin-compat/src/index.ts'),
       '@ray/core': path.resolve(__dirname, './packages/core/src/index.ts'),

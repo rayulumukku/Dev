@@ -25,12 +25,19 @@ function getDirSize(dir) {
 export async function runBenchmark(projectRoot, options) {
     const runs = options.runs || 5;
     console.log(`\n[Ray Benchmark] Starting ${runs} compile runs to measure performance benchmarks...`);
+    const demoDir = path.join(projectRoot, 'demo');
+    const targetRoot = fs.existsSync(path.join(projectRoot, 'index.html'))
+        ? projectRoot
+        : fs.existsSync(demoDir)
+            ? demoDir
+            : projectRoot;
     const durations = [];
     for (let i = 0; i < runs; i++) {
         const start = Date.now();
         // Run production bundler compiler
         await buildProject({
-            outDir: 'dist',
+            root: targetRoot,
+            outDir: path.join(targetRoot, 'dist'),
             minify: true,
             sourcemap: false,
             watch: false,
@@ -267,8 +274,14 @@ export async function runBenchmark(projectRoot, options) {
  */
 export async function measurePerformance(projectRoot) {
     const { RayCore } = await import('../index.js');
+    const demoDir = path.join(projectRoot, 'demo');
+    const targetRoot = fs.existsSync(path.join(projectRoot, 'index.html'))
+        ? projectRoot
+        : fs.existsSync(demoDir)
+            ? demoDir
+            : projectRoot;
     // Find/create entry file for test compilation
-    const entryPath = path.resolve(projectRoot, 'src/main.jsx');
+    const entryPath = path.resolve(targetRoot, 'src/main.jsx');
     let testCode = "import React from 'react'; export default function App() { return <div>Ray</div>; }";
     if (fs.existsSync(entryPath)) {
         testCode = fs.readFileSync(entryPath, 'utf-8');
@@ -276,18 +289,18 @@ export async function measurePerformance(projectRoot) {
     // Record CPU start
     const startCpu = process.cpuUsage();
     // 1. Cold Start
-    const cacheDir = path.join(projectRoot, '.ray/cache');
+    const cacheDir = path.join(targetRoot, '.ray/cache');
     if (fs.existsSync(cacheDir)) {
         fs.rmSync(cacheDir, { recursive: true, force: true });
     }
     const startCold = performance.now();
-    const coreCold = new RayCore(projectRoot, 'production');
+    const coreCold = new RayCore(targetRoot, 'production');
     await coreCold.init();
     await coreCold.transform(testCode, entryPath);
     const coldStart = performance.now() - startCold;
     // 2. Warm Start
     const startWarm = performance.now();
-    const coreWarm = new RayCore(projectRoot, 'production');
+    const coreWarm = new RayCore(targetRoot, 'production');
     await coreWarm.init();
     await coreWarm.transform(testCode, entryPath);
     const warmStart = performance.now() - startWarm;
@@ -299,7 +312,8 @@ export async function measurePerformance(projectRoot) {
     // 4. Build Speed
     const startBuild = performance.now();
     await buildProject({
-        outDir: 'dist',
+        root: targetRoot,
+        outDir: path.join(targetRoot, 'dist'),
         minify: true,
         sourcemap: false,
         watch: false,
@@ -321,7 +335,7 @@ export async function measurePerformance(projectRoot) {
     // 8. Cache Hit Ratio
     const cacheHitRatio = coreWarm.cacheStore.getDiagnostics().hitRate;
     // 9. Bundle Size
-    const bundleSize = getDirSize(path.join(projectRoot, 'dist'));
+    const bundleSize = getDirSize(path.join(targetRoot, 'dist'));
     // 10. Dependency Optimization Time
     const startOpt = performance.now();
     await coreWarm.optimize({ force: true });

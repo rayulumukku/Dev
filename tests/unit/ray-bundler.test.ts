@@ -86,4 +86,83 @@ describe('RayBundler Tests', () => {
     });
     expect(output.code).toContain('"production"');
   });
+
+  it('should transform CJS destructuring, named export clauses, and uninitialized exports', async () => {
+    const src = path.join(projectRoot, 'src', 'cjsAdvancedExports.ts');
+    fs.writeFileSync(
+      src,
+      `export const { host, port } = { host: "localhost", port: 3000 };\n` +
+      `export const [first, second] = [10, 20];\n` +
+      `const localA = 'hello', localB = 'world';\n` +
+      `export { localA, localB as customB };\n` +
+      `export let uninit;\n`
+    );
+    const bundler = new RayBundler(projectRoot);
+    const outFile = path.join(outDir, 'advanced.cjs.js');
+    const output = await bundler.bundle({
+      entryPoint: src,
+      outFile,
+      format: 'cjs',
+    });
+
+    expect(output.code).toContain('exports.host = host;');
+    expect(output.code).toContain('exports.port = port;');
+    expect(output.code).toContain('exports.first = first;');
+    expect(output.code).toContain('exports.second = second;');
+    expect(output.code).toContain('exports.localA = localA;');
+    expect(output.code).toContain('exports.customB = localB;');
+    expect(output.code).toContain('exports.uninit = uninit;');
+
+    // Verify CommonJS execution
+    const modExports: any = {};
+    const moduleObj = { exports: modExports };
+    const runFn = new Function('module', 'exports', output.code);
+    expect(() => runFn(moduleObj, modExports)).not.toThrow();
+    expect(modExports.host).toBe('localhost');
+    expect(modExports.port).toBe(3000);
+    expect(modExports.first).toBe(10);
+    expect(modExports.second).toBe(20);
+    expect(modExports.localA).toBe('hello');
+    expect(modExports.customB).toBe('world');
+    expect('uninit' in modExports).toBe(true);
+  });
+
+  it('should transform destructuring exports with default values in CommonJS format', async () => {
+    const src = path.join(projectRoot, 'src', 'cjsDestructureDefaults.ts');
+    fs.writeFileSync(
+      src,
+      `export const { a, b = 2 } = { a: 1 };\n` +
+      `export const [first, second = 0] = [10];\n` +
+      `export const { host, port = 8080, timeout: t = 5000 } = { host: "example.com" };\n`
+    );
+    const bundler = new RayBundler(projectRoot);
+    const outFile = path.join(outDir, 'destructure-defaults.cjs.js');
+    const output = await bundler.bundle({
+      entryPoint: src,
+      outFile,
+      format: 'cjs',
+    });
+
+    expect(output.code).not.toContain('export const');
+    expect(output.code).toContain('exports.a = a;');
+    expect(output.code).toContain('exports.b = b;');
+    expect(output.code).toContain('exports.first = first;');
+    expect(output.code).toContain('exports.second = second;');
+    expect(output.code).toContain('exports.host = host;');
+    expect(output.code).toContain('exports.port = port;');
+    expect(output.code).toContain('exports.t = t;');
+
+    // Verify CommonJS execution
+    const modExports: any = {};
+    const moduleObj = { exports: modExports };
+    const runFn = new Function('module', 'exports', output.code);
+    expect(() => runFn(moduleObj, modExports)).not.toThrow();
+    expect(modExports.a).toBe(1);
+    expect(modExports.b).toBe(2);
+    expect(modExports.first).toBe(10);
+    expect(modExports.second).toBe(0);
+    expect(modExports.host).toBe('example.com');
+    expect(modExports.port).toBe(8080);
+    expect(modExports.t).toBe(5000);
+  });
 });

@@ -8,14 +8,14 @@ const testTmpDir = path.resolve(process.cwd(), 'temp-templates-test');
 describe('Official Project Templates in create-ray (PR-16)', () => {
   beforeEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
     fs.mkdirSync(testTmpDir, { recursive: true });
   });
 
   afterEach(() => {
     if (fs.existsSync(testTmpDir)) {
-      fs.rmSync(testTmpDir, { recursive: true, force: true });
+      fs.rmSync(testTmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
   });
 

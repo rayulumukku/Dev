@@ -20,6 +20,11 @@ import { runOptimizer } from './optimizer/index.js';
 export { Resolver } from './resolver/index.js';
 export { DependencyGraph } from './graph/index.js';
 export { ModuleNode } from './graph/moduleNode.js';
+export type {
+  ModuleNodeInfo,
+  DependencyEdgeInfo,
+  GraphSnapshotInfo,
+} from './graph/types.js';
 export { buildProject } from './build/index.js';
 export { PluginContainer } from './plugin/container.js';
 export { runOptimizer } from './optimizer/index.js';

@@ -103,4 +103,31 @@ describe('Native Ray Compiler Core Unit Tests', () => {
     expect(res.transformTimeMs).toBeDefined();
     expect(res.emitTimeMs).toBeDefined();
   });
+
+  it('should preserve class method bodies during optimization and compile executable class methods', () => {
+    const code = `export class Calculator {
+      multiply(x, y) {
+        return x * y;
+      }
+      add(a, b) {
+        return a + b;
+      }
+    }`;
+
+    const compiler = new RayCompiler();
+    const res = compiler.compile(code, 'src/calculator.js');
+
+    expect(res.code).toContain('multiply(x, y)');
+    expect(res.code).toContain('return x * y;');
+    expect(res.code).toContain('add(a, b)');
+    expect(res.code).toContain('return a + b;');
+
+    // Evaluate in JS runtime to verify syntax and behavior
+    const evalCode = res.code.replace(/\bexport\s+class\s+Calculator/, 'class Calculator') + '\nreturn Calculator;';
+    const CalcClass = new Function(evalCode)();
+    expect(CalcClass).toBeDefined();
+    const calc = new CalcClass();
+    expect(calc.multiply(3, 4)).toBe(12);
+    expect(calc.add(10, 25)).toBe(35);
+  });
 });

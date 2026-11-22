@@ -221,14 +221,21 @@ export async function buildProject(options: BuildOptions) {
 
     // 2. Generate Type Declarations (.d.ts)
     if (libConfig.dts) {
-      try {
-        console.log(`  > Emitting type declarations (.d.ts) ...`);
-        execSync(`npx tsc --emitDeclarationOnly --declaration --outDir ${baseOutDir}`, {
-          cwd: projectRoot,
-          stdio: 'ignore',
-        });
-      } catch (err) {
-        // Fallback stub declaration file
+      const tsConfigPath = path.join(projectRoot, 'tsconfig.json');
+      if (fs.existsSync(tsConfigPath)) {
+        try {
+          console.log(`  > Emitting type declarations (.d.ts) ...`);
+          execSync(`npx tsc --project "${tsConfigPath}" --emitDeclarationOnly --declaration --outDir "${baseOutDir}"`, {
+            cwd: projectRoot,
+            stdio: 'ignore',
+            timeout: 10000,
+          });
+        } catch (err) {
+          // Fallback stub declaration file
+          fs.writeFileSync(path.join(baseOutDir, 'index.d.ts'), 'export {};\n');
+        }
+      } else {
+        // Fallback stub declaration file when no project-level tsconfig exists
         fs.writeFileSync(path.join(baseOutDir, 'index.d.ts'), 'export {};\n');
       }
     }

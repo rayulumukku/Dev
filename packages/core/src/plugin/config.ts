@@ -62,6 +62,127 @@ export async function loadConfig(projectRoot: string) {
   }
 }
 
+function stripTypeAnnotations(src: string): string {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    let i = 0;
+    while (i < src.length) {
+      // Skip string literals
+      if (src[i] === "'" || src[i] === '"' || src[i] === '`') {
+        const quote = src[i];
+        i++;
+        while (i < src.length && src[i] !== quote) {
+          if (src[i] === '\\') i++;
+          i++;
+        }
+        if (i < src.length) i++;
+        continue;
+      }
+      // Skip single-line comments
+      if (src[i] === '/' && src[i + 1] === '/') {
+        i += 2;
+        while (i < src.length && src[i] !== '\n') i++;
+        continue;
+      }
+      // Skip multi-line comments
+      if (src[i] === '/' && src[i + 1] === '*') {
+        i += 2;
+        while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+        if (i < src.length) i += 2;
+        continue;
+      }
+
+      let keyword = '';
+      if (src.slice(i).match(/^satisfies\b/)) {
+        keyword = 'satisfies';
+      } else if (src.slice(i).match(/^as\b/)) {
+        const before = src.slice(0, i);
+        const isImportExportAs = /\*\s*$/.test(before) ||
+          /(?:^|\n)\s*import\b[^;]*$/.test(before) ||
+          /(?:^|\n)\s*export\s*\{[^}]*$/.test(before);
+        if (!isImportExportAs) {
+          keyword = 'as';
+        }
+      }
+
+      if (keyword) {
+        const prevChar = i > 0 ? src[i - 1] : ' ';
+        if (!/[a-zA-Z0-9_$]/.test(prevChar)) {
+          let pos = i + keyword.length;
+          if (pos < src.length && /\s/.test(src[pos])) {
+            while (pos < src.length && /\s/.test(src[pos])) pos++;
+            let angleDepth = 0;
+            let bracketDepth = 0;
+            let parenDepth = 0;
+            let braceDepth = 0;
+            let typeEnd = pos;
+
+            while (typeEnd < src.length) {
+              const ch = src[typeEnd];
+
+              if (angleDepth === 0 && bracketDepth === 0 && parenDepth === 0 && braceDepth === 0) {
+                if (ch === ';' || ch === ',' || ch === '}' || ch === ']' || ch === ')') {
+                  break;
+                }
+                if (ch === '\n') {
+                  break;
+                }
+                if (ch === 'a' && src.slice(typeEnd).match(/^as\s+/)) {
+                  break;
+                }
+                if (ch === 's' && src.slice(typeEnd).match(/^satisfies\s+/)) {
+                  break;
+                }
+              }
+
+              if (ch === "'" || ch === '"' || ch === '`') {
+                const q = ch;
+                typeEnd++;
+                while (typeEnd < src.length && src[typeEnd] !== q) {
+                  if (src[typeEnd] === '\\') typeEnd++;
+                  typeEnd++;
+                }
+                if (typeEnd < src.length) typeEnd++;
+                continue;
+              }
+
+              if (ch === '<') angleDepth++;
+              else if (ch === '>') {
+                if (angleDepth > 0) angleDepth--;
+                else break;
+              } else if (ch === '[') bracketDepth++;
+              else if (ch === ']') {
+                if (bracketDepth > 0) bracketDepth--;
+                else break;
+              } else if (ch === '(') parenDepth++;
+              else if (ch === ')') {
+                if (parenDepth > 0) parenDepth--;
+                else break;
+              } else if (ch === '{') braceDepth++;
+              else if (ch === '}') {
+                if (braceDepth > 0) braceDepth--;
+                else break;
+              }
+
+              typeEnd++;
+            }
+
+            if (typeEnd > pos) {
+              src = src.slice(0, i) + src.slice(typeEnd);
+              changed = true;
+              break;
+            }
+          }
+        }
+      }
+
+      i++;
+    }
+  }
+  return src;
+}
+
 /**
  * Lightweight TypeScript syntax stripper.
  *
@@ -72,7 +193,7 @@ export async function loadConfig(projectRoot: string) {
  * - `as Type` casts
  * - Generic type parameters `<T>` on non-JSX calls
  */
-function stripTypeScript(src: string): string {
+export function stripTypeScript(src: string): string {
   // Remove `import type` statements
   src = src.replace(/^import\s+type\s+[^\n]+\n/gm, '');
 
@@ -88,8 +209,8 @@ function stripTypeScript(src: string): string {
   // Remove `: TypeAnnotation` from function parameters using a safe whitelist of types
   src = src.replace(/:\s*(?:ConfigEnv|UserConfig|RayConfig|any|string|number|boolean|object|void|unknown|never|Record|Array)\b/g, '');
 
-  // Remove `as Type` casts (but not `async`)
-  src = src.replace(/\bas\s+[A-Z]\w*/g, '');
+  // Remove `as Type` casts and `satisfies Type` expressions
+  src = stripTypeAnnotations(src);
 
   // Remove leading/trailing whitespace artifacts
   src = src.replace(/\n{3,}/g, '\n\n');
