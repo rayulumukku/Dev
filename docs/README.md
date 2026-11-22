@@ -66,10 +66,10 @@ sequenceDiagram
 ### Module Graph
 ```mermaid
 graph TD
-    index.html --> main.tsx
-    main.tsx --> App.tsx
-    App.tsx --> Button.tsx
-    App.tsx --> style.css
+    Index["index.html"] --> Main["main.tsx"]
+    Main --> App["App.tsx"]
+    App --> Button["Button.tsx"]
+    App --> Style["style.css"]
 ```
 
 ### Plugin Lifecycle

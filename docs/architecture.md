@@ -111,8 +111,8 @@ The optimizer pre-bundles commonjs and esm packages to minimize browser network 
 graph TD
   Start["Dev server start"] --> Scan["Scan files for bare imports"]
   Scan --> CheckCache["Check cached metadata.json hash"]
-  CheckCache -- Match -- > Dev["Serve immediately"]
-  CheckCache -- Miss -- > Bundle["Pre-bundle bare modules via RayBundler"]
+  CheckCache -->|Match| Dev["Serve immediately"]
+  CheckCache -->|Miss| Bundle["Pre-bundle bare modules via RayBundler"]
   Bundle --> Save["Write to .ray/cache and update metadata"]
 ```
 
@@ -126,8 +126,8 @@ The cache system hashes modules to optimize subsequent startup runs.
 graph LR
   Source["Source Code changes"] --> Hash["Compute content SHA-256"]
   Hash --> CacheCheck["Lookup .ray/cache metadata"]
-  CacheCheck -- Hit -- > Return["Load cached output and AST"]
-  CacheCheck -- Miss -- > Compile["Run transform pipeline & save to cache"]
+  CacheCheck -->|Hit| Return["Load cached output and AST"]
+  CacheCheck -->|Miss| Compile["Run transform pipeline & save to cache"]
 ```
 
 ---
@@ -138,7 +138,7 @@ Ray Studio provides visual telemetry insights, diagnostics graphs, and custom pa
 
 ```mermaid
 graph TD
-  Server["Dev Server Engine"] -- telemetry -- > WebSocket["WebSocket API Server"]
+  Server["Dev Server Engine"] -->|telemetry| WebSocket["WebSocket API Server"]
   WebSocket --> StudioHTML["Ray Studio Panel (studio.html)"]
   StudioHTML --> UI["Render Interactive Dev Telemetry Dashboards"]
 ```
